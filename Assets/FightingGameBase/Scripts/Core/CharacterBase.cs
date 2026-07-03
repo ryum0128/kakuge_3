@@ -108,7 +108,7 @@ namespace FightingGameBase
 
         // --- 攻撃処理 ---
         
-        public void AttackNormal()
+        public virtual void AttackNormal()
         {
             if (isDead) return;
             
@@ -133,7 +133,7 @@ namespace FightingGameBase
             hitboxObj.SetActive(false); // 攻撃判定を消す
         }
 
-        public void AttackSpecial()
+        public virtual void AttackSpecial()
         {
             if (isDead) return;
             
@@ -142,7 +142,7 @@ namespace FightingGameBase
             Debug.Log("特殊攻撃発動！");
         }
 
-        public void AttackUltimate()
+        public virtual void AttackUltimate()
         {
             if (isDead) return;
             
@@ -155,7 +155,7 @@ namespace FightingGameBase
         // ダメージとゲームオーバーの処理
         // =========================================================
 
-        public void TakeDamage(int damage)
+        public virtual void TakeDamage(int damage, Hitbox attackerHitbox = null)
         {
             if (isDead) return;
 

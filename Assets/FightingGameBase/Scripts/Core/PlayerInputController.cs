@@ -15,9 +15,9 @@ namespace FightingGameBase
         [Header("キー設定 (インスペクターで自由に変更可能)")]
         
         // Key.○○ と設定しておくことで、どのキーを押したら反応するかを変更できます
-        public Key leftKey = Key.LeftArrow;      // 左移動
-        public Key rightKey = Key.RightArrow;    // 右移動
-        public Key jumpKey = Key.UpArrow;        // ジャンプ
+        public Key leftKey = Key.A;              // 左移動
+        public Key rightKey = Key.D;             // 右移動
+        public Key jumpKey = Key.Space;          // ジャンプ
         public Key normalAttackKey = Key.Z;      // 通常攻撃
         public Key specialAttackKey = Key.X;     // 特殊攻撃
 

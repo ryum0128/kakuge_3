@@ -17,6 +17,9 @@ namespace FightingGameBase
         [Tooltip("誰の攻撃判定か（1ならプレイヤー1。自分自身には当たらないようにするためです）")]
         public int ownerPlayerID = 1;
 
+        [Tooltip("これが飛び道具（遠距離攻撃）かどうか")]
+        public bool isProjectile = false;
+
         // OnTriggerEnter2D は、この「攻撃判定」が「他の誰かの判定」に重なった瞬間に
         // Unityが自動的に呼び出してくれる便利なメソッド（機能）です！
         private void OnTriggerEnter2D(Collider2D other)
@@ -28,7 +31,7 @@ namespace FightingGameBase
             if (hurtbox != null && hurtbox.owner != null && hurtbox.owner.playerID != ownerPlayerID)
             {
                 // 相手にダメージを与えます！
-                hurtbox.TakeDamage(damage);
+                hurtbox.TakeDamage(this);
                 
                 // 【改造のヒント】
                 // もし「攻撃が当たったときに火花を出したい！」「ドカンという音を鳴らしたい！」
