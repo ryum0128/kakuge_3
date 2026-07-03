@@ -24,15 +24,19 @@ namespace FightingGameBase
 
         // --- プログラム内で使う部品（コンポーネント） ---
         private Rigidbody2D rb;      // 物理エンジン（重力や移動を計算する機能）
-        private Animator animator;   // アニメーションを再生する機能
+        protected Animator animator;   // アニメーションを再生する機能
 
-        void Start()
+        protected virtual void Start()
         {
             // 自分自身についている Rigidbody2D を取得します
             rb = GetComponent<Rigidbody2D>();
             
             // 子オブジェクト（Visualsなど）についている Animator を取得します
             animator = GetComponentInChildren<Animator>(); 
+            if (animator != null && animator.runtimeAnimatorController == null)
+            {
+                animator = null;
+            }
             
             // もしステータス（CharacterStats）がセットされていれば、最初の体力を最大HPにします
             if (stats != null)
@@ -108,7 +112,7 @@ namespace FightingGameBase
 
         // --- 攻撃処理 ---
         
-        public void AttackNormal()
+        public virtual void AttackNormal()
         {
             if (isDead) return;
             
@@ -126,14 +130,14 @@ namespace FightingGameBase
         }
 
         // 時間差で処理を行うための仕組み（コルーチン）です
-        private System.Collections.IEnumerator ActivateHitboxTemporarily(GameObject hitboxObj, float duration)
+        protected System.Collections.IEnumerator ActivateHitboxTemporarily(GameObject hitboxObj, float duration)
         {
             hitboxObj.SetActive(true); // 攻撃判定を出す（赤い箱が現れる）
             yield return new WaitForSeconds(duration); // 指定した時間（今回は0.2秒）だけ待つ
             hitboxObj.SetActive(false); // 攻撃判定を消す
         }
 
-        public void AttackSpecial()
+        public virtual void AttackSpecial()
         {
             if (isDead) return;
             
@@ -155,7 +159,7 @@ namespace FightingGameBase
         // ダメージとゲームオーバーの処理
         // =========================================================
 
-        public void TakeDamage(int damage)
+        public virtual void TakeDamage(int damage)
         {
             if (isDead) return;
 
@@ -192,5 +196,15 @@ namespace FightingGameBase
                 GameManager.Instance.OnCharacterDied(playerID);
             }
         }
+
+        // =========================================================
+        // ブロック・パリー（子クラスでオーバーライドして実装）
+        // =========================================================
+
+        // ブロックキーを押し始めたときに呼ばれます
+        public virtual void StartBlock() { }
+
+        // ブロックキーを離したときに呼ばれます
+        public virtual void StopBlock() { }
     }
 }
