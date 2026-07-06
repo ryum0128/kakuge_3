@@ -22,6 +22,8 @@ namespace FightingGameBase
 
         private Transform visualsTransform;
         private bool isSwinging = false;
+        private GameObject blockShieldObject;
+        private SpriteRenderer blockShieldRenderer;
 
         void Start()
         {
@@ -55,6 +57,15 @@ namespace FightingGameBase
                                $"・アタッチされているオブジェクト: '{gameObject.name}'\n" +
                                $"・検知された子オブジェクト: {childrenList}\n" +
                                $"・対策: 生成メニューを再実行し、新しく生成されたプレハブを配置し直してください。");
+            }
+
+            // ブロック・パリー用シールドマークの取得
+            Transform shield = transform.Find("BlockShield");
+            if (shield != null)
+            {
+                blockShieldObject = shield.gameObject;
+                blockShieldRenderer = shield.GetComponent<SpriteRenderer>();
+                blockShieldObject.SetActive(false); // 初期状態は非アクティブ
             }
         }
 
@@ -349,50 +360,91 @@ namespace FightingGameBase
 
         // --- ブロック・パリーのアニメーションコルーチン ---
 
-        // ブロック姿勢に素早く移行する
+        // ブロック姿勢に素早く移行する（青いシールドマークを表示）
         private IEnumerator BlockEnterRoutine()
         {
+            if (visualsTransform != null)
+            {
+                visualsTransform.localRotation = Quaternion.identity;
+            }
+
+            if (blockShieldObject != null)
+            {
+                blockShieldObject.transform.localPosition = new Vector3(1.0f, 1.0f, 0f);
+                blockShieldObject.SetActive(true);
+            }
+
             float elapsed = 0f;
-            float startAngle = visualsTransform != null
-                ? visualsTransform.localRotation.eulerAngles.z
-                : 0f;
-            // eulerAngles は 0-360 で返ってくるので -180 変換
-            if (startAngle > 180f) startAngle -= 360f;
+            Vector3 targetScale = new Vector3(0.5f, 0.5f, 1f);
+            Color targetColor = new Color(0.2f, 0.6f, 1.0f, 0.75f); // 青いシールド
 
             while (elapsed < blockEnterDuration)
             {
                 elapsed += Time.deltaTime;
                 float t = elapsed / blockEnterDuration;
-                // 素早く移行（EaseOut）
+                // 素べく移行（EaseOut）
                 t = 1f - Mathf.Pow(1f - t, 3f);
-                float angle = Mathf.Lerp(startAngle, blockAngle, t);
-                if (visualsTransform != null)
-                    visualsTransform.localRotation = Quaternion.Euler(0, 0, angle);
+
+                if (blockShieldObject != null)
+                {
+                    blockShieldObject.transform.localScale = Vector3.Lerp(Vector3.zero, targetScale, t);
+                }
+
+                if (blockShieldRenderer != null)
+                {
+                    blockShieldRenderer.color = new Color(targetColor.r, targetColor.g, targetColor.b, targetColor.a * t);
+                }
+
                 yield return null;
             }
 
-            if (visualsTransform != null)
-                visualsTransform.localRotation = Quaternion.Euler(0, 0, blockAngle);
+            if (blockShieldObject != null)
+            {
+                blockShieldObject.transform.localScale = targetScale;
+            }
+            if (blockShieldRenderer != null)
+            {
+                blockShieldRenderer.color = targetColor;
+            }
         }
 
-        // ブロック姿勢から元の位置に戻る
+        // ブロック姿勢から元の位置に戻る（シールドマークを非表示）
         private IEnumerator BlockExitRoutine()
         {
             float elapsed = 0f;
             float exitDuration = 0.15f;
+            Vector3 startScale = blockShieldObject != null ? blockShieldObject.transform.localScale : new Vector3(0.5f, 0.5f, 1f);
+            Color baseColor = new Color(0.2f, 0.6f, 1.0f, 0.75f); // 青
+            float startAlpha = blockShieldRenderer != null ? blockShieldRenderer.color.a : baseColor.a;
 
             while (elapsed < exitDuration)
             {
                 elapsed += Time.deltaTime;
-                float t = Mathf.Sin((elapsed / exitDuration) * Mathf.PI * 0.5f);
-                float angle = Mathf.Lerp(blockAngle, 0f, t);
-                if (visualsTransform != null)
-                    visualsTransform.localRotation = Quaternion.Euler(0, 0, angle);
+                float t = elapsed / exitDuration;
+                // 滑らかに戻る（EaseIn）
+                float easeT = t * t;
+
+                if (blockShieldObject != null)
+                {
+                    blockShieldObject.transform.localScale = Vector3.Lerp(startScale, Vector3.zero, easeT);
+                }
+
+                if (blockShieldRenderer != null)
+                {
+                    blockShieldRenderer.color = new Color(baseColor.r, baseColor.g, baseColor.b, Mathf.Lerp(startAlpha, 0f, easeT));
+                }
+
                 yield return null;
             }
 
+            if (blockShieldObject != null)
+            {
+                blockShieldObject.SetActive(false);
+            }
             if (visualsTransform != null)
+            {
                 visualsTransform.localRotation = Quaternion.identity;
+            }
         }
 
         // パリー受付窓を一定時間後に閉じる
@@ -406,70 +458,114 @@ namespace FightingGameBase
             }
         }
 
-        // パリー成功時のバウンスアニメーション
+        // パリー成功時のポップアップとフラッシュ演出（シールドを白くする）
         private IEnumerator ParrySuccessRoutine()
         {
-            // ① 一瞬ぐっと後ろに弾かれる（衝撃）
-            float elapsed = 0f;
-            float bounceDuration = 0.06f;
-            while (elapsed < bounceDuration)
+            if (visualsTransform != null)
             {
-                elapsed += Time.deltaTime;
-                float t = elapsed / bounceDuration;
-                float angle = Mathf.Lerp(blockAngle, blockAngle - 40f, t);
-                if (visualsTransform != null)
-                    visualsTransform.localRotation = Quaternion.Euler(0, 0, angle);
-                yield return null;
+                visualsTransform.localRotation = Quaternion.identity;
             }
 
-            // ② キラッと逆方向に切り返す（パリー反撃の気配）
-            elapsed = 0f;
-            float flashDuration = 0.1f;
+            float elapsed = 0f;
+            float flashDuration = 0.12f;
+            Vector3 normalScale = new Vector3(0.5f, 0.5f, 1f);
+            Vector3 parryPopScale = new Vector3(0.9f, 0.9f, 1f);
+            Color baseColor = new Color(0.2f, 0.6f, 1.0f, 0.75f); // 青
+            Color parryFlashColor = new Color(1.0f, 1.0f, 1.0f, 0.95f); // パリー時は白いシールド
+
+            // 1. 素早く拡大＆フラッシュ（白く）
             while (elapsed < flashDuration)
             {
                 elapsed += Time.deltaTime;
                 float t = elapsed / flashDuration;
-                float angle = Mathf.Lerp(blockAngle - 40f, blockAngle + 25f, t * t);
-                if (visualsTransform != null)
-                    visualsTransform.localRotation = Quaternion.Euler(0, 0, angle);
+                float easeT = 1f - Mathf.Pow(1f - t, 3f); // EaseOut
+
+                if (blockShieldObject != null)
+                {
+                    blockShieldObject.transform.localScale = Vector3.Lerp(normalScale, parryPopScale, easeT);
+                }
+                if (blockShieldRenderer != null)
+                {
+                    blockShieldRenderer.color = Color.Lerp(baseColor, parryFlashColor, easeT);
+                }
                 yield return null;
             }
 
-            // ③ ゆっくりガード姿勢に戻る（まだブロック中）
+            // 2. 元のサイズに戻る
             elapsed = 0f;
-            float returnDuration = 0.12f;
+            float returnDuration = 0.18f;
             while (elapsed < returnDuration)
             {
                 elapsed += Time.deltaTime;
-                float t = Mathf.Sin((elapsed / returnDuration) * Mathf.PI * 0.5f);
-                float angle = Mathf.Lerp(blockAngle + 25f, blockAngle, t);
-                if (visualsTransform != null)
-                    visualsTransform.localRotation = Quaternion.Euler(0, 0, angle);
+                float t = elapsed / returnDuration;
+                float easeT = Mathf.SmoothStep(0f, 1f, t);
+
+                if (blockShieldObject != null)
+                {
+                    blockShieldObject.transform.localScale = Vector3.Lerp(parryPopScale, normalScale, easeT);
+                }
+                if (blockShieldRenderer != null)
+                {
+                    blockShieldRenderer.color = Color.Lerp(parryFlashColor, baseColor, easeT);
+                }
                 yield return null;
             }
 
-            if (visualsTransform != null)
-                visualsTransform.localRotation = Quaternion.Euler(0, 0, blockAngle);
+            if (blockShieldObject != null)
+            {
+                blockShieldObject.transform.localScale = normalScale;
+            }
+            if (blockShieldRenderer != null)
+            {
+                blockShieldRenderer.color = baseColor;
+            }
         }
 
-        // 通常ブロック被弾時の小さな揺れアニメーション
+        // 通常ブロック被弾時のシェイクと赤パルス演出（ブロックしたときに赤くする）
         private IEnumerator BlockHitRoutine()
         {
+            if (visualsTransform != null)
+            {
+                visualsTransform.localRotation = Quaternion.identity;
+            }
+
             float elapsed = 0f;
-            float shakeDuration = 0.08f;
+            float shakeDuration = 0.12f;
+            Vector3 normalScale = new Vector3(0.5f, 0.5f, 1f);
+            Color baseColor = new Color(0.2f, 0.6f, 1.0f, 0.75f); // 青
+            Color hitFlashColor = new Color(1.0f, 0.1f, 0.1f, 0.85f); // ブロック時は赤
+
             while (elapsed < shakeDuration)
             {
                 elapsed += Time.deltaTime;
                 float t = elapsed / shakeDuration;
-                // 小さく揺れる
-                float angle = blockAngle - Mathf.Sin(t * Mathf.PI) * 15f;
-                if (visualsTransform != null)
-                    visualsTransform.localRotation = Quaternion.Euler(0, 0, angle);
+
+                // 左右に細かく揺らし、サイズをパルスさせる
+                float offset = Mathf.Sin(t * Mathf.PI * 4f) * 0.15f; 
+                if (blockShieldObject != null)
+                {
+                    blockShieldObject.transform.localPosition = new Vector3(1.0f + offset, 1.0f, 0f);
+                    blockShieldObject.transform.localScale = normalScale * (1f + Mathf.Sin(t * Mathf.PI) * 0.15f);
+                }
+
+                if (blockShieldRenderer != null)
+                {
+                    blockShieldRenderer.color = Color.Lerp(baseColor, hitFlashColor, Mathf.Sin(t * Mathf.PI));
+                }
+
                 yield return null;
             }
 
-            if (visualsTransform != null)
-                visualsTransform.localRotation = Quaternion.Euler(0, 0, blockAngle);
+            // 初期位置とサイズ、色を復元（青に戻す）
+            if (blockShieldObject != null)
+            {
+                blockShieldObject.transform.localPosition = new Vector3(1.0f, 1.0f, 0f);
+                blockShieldObject.transform.localScale = normalScale;
+            }
+            if (blockShieldRenderer != null)
+            {
+                blockShieldRenderer.color = baseColor;
+            }
         }
     }
 }

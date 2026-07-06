@@ -351,9 +351,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7db0026401e3c6848831e420317953ee, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FightingGameBase.PlayerInputController
-  leftKey: 61
-  rightKey: 62
-  jumpKey: 63
-  normalAttackKey: 40
-  specialAttackKey: 38
+  leftKey: 15
+  rightKey: 18
+  jumpKey: 1
+  normalAttackKey: 24
+  specialAttackKey: 25
+  blockKey: 22
   simultaneousPressWindow: 0.05

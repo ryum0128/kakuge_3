@@ -61,6 +61,46 @@ namespace FightingGameBase.Editor
                 Debug.LogWarning($"スプライト画像が見つかりませんでした: {spritePath}\n先に画像を配置してください。");
             }
 
+            // 1.5. シールド画像のアセット設定の最適化
+            string shieldSpritePath = "Assets/TAIKEN/Shield.png";
+            TextureImporter shieldImporter = AssetImporter.GetAtPath(shieldSpritePath) as TextureImporter;
+            if (shieldImporter != null)
+            {
+                bool needsReimport = false;
+                if (shieldImporter.textureType != TextureImporterType.Sprite)
+                {
+                    shieldImporter.textureType = TextureImporterType.Sprite;
+                    needsReimport = true;
+                }
+                if (shieldImporter.alphaIsTransparency == false)
+                {
+                    shieldImporter.alphaIsTransparency = true;
+                    needsReimport = true;
+                }
+                if (shieldImporter.filterMode != FilterMode.Point)
+                {
+                    shieldImporter.filterMode = FilterMode.Point;
+                    needsReimport = true;
+                }
+                if (shieldImporter.textureCompression != TextureImporterCompression.Uncompressed)
+                {
+                    shieldImporter.textureCompression = TextureImporterCompression.Uncompressed;
+                    needsReimport = true;
+                }
+
+                if (needsReimport)
+                {
+                    shieldImporter.SaveAndReimport();
+                    Debug.Log("シールドのスプライト画像を最適化し、再インポートしました。");
+                }
+            }
+
+            Sprite shieldSprite = AssetDatabase.LoadAssetAtPath<Sprite>(shieldSpritePath);
+            if (shieldSprite == null)
+            {
+                Debug.LogWarning($"シールドのスプライト画像が見つかりませんでした: {shieldSpritePath}\n先に画像を配置してください。");
+            }
+
             // 2. ルート（一番親）となるオブジェクトの作成
             GameObject root = new GameObject("FloatingGreatsword");
             
@@ -135,10 +175,17 @@ namespace FightingGameBase.Editor
             shieldObj.transform.localPosition = new Vector3(1.0f, 1.0f, 0f); // 大剣の正面に配置
 
             SpriteRenderer shieldSr = shieldObj.AddComponent<SpriteRenderer>();
-            // ビルトインの円形スプライト（Knob）を使ってシールドを表現
-            shieldSr.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
-            shieldSr.color = new Color(0.3f, 0.8f, 1.0f, 0.55f); // 半透明シアン（魔法陣っぽい）
-            shieldSr.transform.localScale = new Vector3(2.2f, 2.2f, 1f);
+            if (shieldSprite != null)
+            {
+                shieldSr.sprite = shieldSprite;
+            }
+            else
+            {
+                // ビルトインの円形スプライト（Knob）を使ってシールドを表現
+                shieldSr.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
+            }
+            shieldSr.color = new Color(0.3f, 0.7f, 1.0f, 0.7f); // 半透明青（初期色）
+            shieldSr.transform.localScale = new Vector3(1.5f, 1.5f, 1f);
             shieldSr.sortingOrder = 1; // キャラクターの前面に表示
 
             shieldObj.SetActive(false); // 初期状態は非表示
