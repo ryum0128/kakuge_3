@@ -27,7 +27,7 @@ Transform:
   m_GameObject: {fileID: 223014869964354531}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.8, y: 0.5, z: 0}
+  m_LocalPosition: {x: 1.4, y: 0.5, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -77,7 +77,7 @@ BoxCollider2D:
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 0.8, y: 0.5}
+  m_Size: {x: 2.6, y: 0.8}
   m_EdgeRadius: 0
 --- !u!114 &7870319515612093074
 MonoBehaviour:
@@ -104,7 +104,7 @@ GameObject:
   m_Component:
   - component: {fileID: 6478704678610596988}
   - component: {fileID: 7990396500539489036}
-  - component: {fileID: 6558468554561412718}
+  - component: {fileID: 4519470831170101161}
   m_Layer: 0
   m_Name: Visuals
   m_TagString: Untagged
@@ -176,17 +176,17 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_MaskInteraction: 0
-  m_Sprite: {fileID: -1137498722916577873, guid: 658e0be10bc2de542b3cebdd55f0f309, type: 3}
+  m_Sprite: {fileID: 10905, guid: 0000000000000000f000000000000000, type: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
-  m_DrawMode: 0
-  m_Size: {x: 10.24, y: 10.24}
+  m_DrawMode: 1
+  m_Size: {x: 2.857143, y: 5.714286}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
---- !u!114 &6558468554561412718
+--- !u!114 &4519470831170101161
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -195,12 +195,105 @@ MonoBehaviour:
   m_GameObject: {fileID: 4800324924547317727}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 40941c8cc4691eb46b7a2a00fea0600e, type: 3}
+  m_Script: {fileID: 11500000, guid: 60550021ca634a349bdb2d33c11255da, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FightingGameBase.FloatingBehavior
-  amplitude: 0.15
-  frequency: 3
-  baseOffset: 0.6
+  amplitude: 0.1
+  frequency: 2
+--- !u!1 &5725104785044667570
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6714686545794628982}
+  - component: {fileID: 3948717767591022564}
+  - component: {fileID: 5251012623034075400}
+  m_Layer: 0
+  m_Name: CounterHitbox
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!4 &6714686545794628982
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5725104785044667570}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 1.5, y: 0.5, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 4758507900536977854}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!61 &3948717767591022564
+BoxCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5725104785044667570}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_IsTrigger: 1
+  m_UsedByEffector: 0
+  m_CompositeOperation: 0
+  m_CompositeOrder: 0
+  m_Offset: {x: 0, y: 0}
+  m_SpriteTilingProperty:
+    border: {x: 0, y: 0, z: 0, w: 0}
+    pivot: {x: 0, y: 0}
+    oldSize: {x: 0, y: 0}
+    newSize: {x: 0, y: 0}
+    adaptiveTilingThreshold: 0
+    drawMode: 0
+    adaptiveTiling: 0
+  m_AutoTiling: 0
+  m_Size: {x: 2.5, y: 1.5}
+  m_EdgeRadius: 0
+--- !u!114 &5251012623034075400
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5725104785044667570}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f6069def85c90764c9c3adec27a91ff0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FightingGameBase.Hitbox
+  damage: 30
+  ownerPlayerID: 1
+  isProjectile: 0
 --- !u!1 &7073232099250164688
 GameObject:
   m_ObjectHideFlags: 0
@@ -212,7 +305,7 @@ GameObject:
   - component: {fileID: 4758507900536977854}
   - component: {fileID: 8881056097618635027}
   - component: {fileID: 471340721167247365}
-  - component: {fileID: 8658226051371578399}
+  - component: {fileID: 8661476088865405214}
   - component: {fileID: 2566610112814248890}
   - component: {fileID: 3040966132986203651}
   m_Layer: 0
@@ -237,6 +330,7 @@ Transform:
   m_Children:
   - {fileID: 6478704678610596988}
   - {fileID: 5639753659679709466}
+  - {fileID: 6714686545794628982}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!50 &8881056097618635027
@@ -303,7 +397,7 @@ CapsuleCollider2D:
   m_Offset: {x: 0, y: 0}
   m_Size: {x: 1, y: 2}
   m_Direction: 0
---- !u!114 &8658226051371578399
+--- !u!114 &8661476088865405214
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -312,7 +406,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 7073232099250164688}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a1274e465529677478fd3fa1d9abe579, type: 3}
+  m_Script: {fileID: 11500000, guid: 37c727c4717013c4887ee3235105e8c1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FightingGameBase.LightsaberCharacter
   stats: {fileID: 11400000, guid: e3d806bca45a5fa4bac626e7685c1bac, type: 2}
@@ -320,13 +414,11 @@ MonoBehaviour:
   currentHP: 0
   isGrounded: 0
   isDead: 0
-  counterDuration: 0.5
-  perfectCounterWindow: 0.15
-  counterDamage: 50
-  spriteNormal: {fileID: -1137498722916577873, guid: 658e0be10bc2de542b3cebdd55f0f309, type: 3}
-  spriteCounterStance: {fileID: -1535619013367132362, guid: 9e2ab57eed842b541ad201ba95e33de1, type: 3}
-  spriteCounterFlash: {fileID: 4041802495521562434, guid: 2b47aaa64f90afe42882240617e5bc72, type: 3}
-  spriteCounterAttack: {fileID: 7934270143190469591, guid: 677eb23dd89d50e49b9ff6fcefa545a4, type: 3}
+  spriteNormal: {fileID: 0}
+  spriteCounterStance: {fileID: 0}
+  spriteCounterFlash: {fileID: 0}
+  spriteCounterAttack: {fileID: 0}
+  counterHitbox: {fileID: 5251012623034075400}
 --- !u!114 &2566610112814248890
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -339,7 +431,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 89ed20f6fd7107d4eaa07af988c2b6a1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FightingGameBase.Hurtbox
-  owner: {fileID: 8658226051371578399}
+  owner: {fileID: 8661476088865405214}
 --- !u!114 &3040966132986203651
 MonoBehaviour:
   m_ObjectHideFlags: 0

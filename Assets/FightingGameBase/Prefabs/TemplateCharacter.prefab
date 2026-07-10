@@ -251,7 +251,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 5184327826282647491}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 40941c8cc4691eb46b7a2a00fea0600e, type: 3}
+  m_Script: {fileID: 11500000, guid: 60550021ca634a349bdb2d33c11255da, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FightingGameBase.FloatingBehavior
   amplitude: 0.15

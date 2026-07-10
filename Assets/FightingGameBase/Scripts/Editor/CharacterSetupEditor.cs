@@ -2,6 +2,7 @@
 using UnityEditor;
 using UnityEngine;
 
+
 namespace FightingGameBase.Editor
 {
     [InitializeOnLoad]
@@ -144,13 +145,17 @@ namespace FightingGameBase.Editor
             if (customSprite != null)
             {
                 sr.sprite = customSprite;
+                // 当たり判定とキャラ画像の大きさを同じにする（スケール0.35を考慮）
+                hurtCollider.size = new Vector2(customSprite.bounds.size.x * 0.35f, customSprite.bounds.size.y * 0.35f);
             }
             else
             {
-                // 見やすいように仮の画像（四角形）をセットし、当たり判定と同じサイズにする
+                // 見やすいように仮の画像（四角形）をセットし、当たり判定（1x2）と同じサイズにする
                 sr.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
                 sr.drawMode = SpriteDrawMode.Sliced;
-                sr.size = new Vector2(1f, 2f);
+                // スケールが0.35なので、1x2にするためには逆算して大きくしておく
+                sr.size = new Vector2(1f / 0.35f, 2f / 0.35f);
+                hurtCollider.size = new Vector2(1f, 2f);
             }
             
             // visuals.AddComponent<Animator>();       // スプライト1枚のみにするため、アニメーターは除外
@@ -251,13 +256,17 @@ namespace FightingGameBase.Editor
             if (customSprite != null)
             {
                 sr.sprite = customSprite;
+                // 当たり判定とキャラ画像の大きさを同じにする（スケール0.35を考慮）
+                hurtCollider.size = new Vector2(customSprite.bounds.size.x * 0.35f, customSprite.bounds.size.y * 0.35f);
             }
             else
             {
-                // 見やすいように仮の画像（四角形）をセットし、当たり判定と同じサイズにする
+                // 見やすいように仮の画像（四角形）をセットし、当たり判定（1x2）と同じサイズにする
                 sr.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
                 sr.drawMode = SpriteDrawMode.Sliced;
-                sr.size = new Vector2(1f, 2f);
+                // スケールが0.35なので、1x2にするためには逆算して大きくしておく
+                sr.size = new Vector2(1f / 0.35f, 2f / 0.35f);
+                hurtCollider.size = new Vector2(1f, 2f);
             }
             
             // visuals.AddComponent<Animator>();       // スプライト1枚のみにするため、アニメーターは除外
@@ -266,13 +275,14 @@ namespace FightingGameBase.Editor
             // 3. 攻撃判定（Hitbox）の階層 (リーチは普通、攻撃の発生も早い)
             GameObject hitboxObj = new GameObject("LightsaberHitbox");
             hitboxObj.transform.SetParent(root.transform);
-            // 少し前方の、手が出るあたりに配置 (テンプレートと同等)
-            hitboxObj.transform.localPosition = new Vector3(0.8f, 0.5f, 0f); 
+            // ライトセーバーの刀身全体（根本から剣先まで）をカバーするように配置
+            hitboxObj.transform.localPosition = new Vector3(1.4f, 0.5f, 0f); 
             
             // 攻撃判定用のコライダー（トリガーにするのがポイント！）
             BoxCollider2D hitCollider = hitboxObj.AddComponent<BoxCollider2D>();
             hitCollider.isTrigger = true;
-            hitCollider.size = new Vector2(0.8f, 0.5f);
+            // 横に長くして刀身全体を包み込む
+            hitCollider.size = new Vector2(2.6f, 0.8f);
 
             // 用意したHitboxスクリプトをアタッチ
             Hitbox hitbox = hitboxObj.AddComponent<Hitbox>();
@@ -281,6 +291,24 @@ namespace FightingGameBase.Editor
 
             // 最初は攻撃していないので、非アクティブ（オフ）にしておく
             hitboxObj.SetActive(false);
+            
+            // 3.5. カウンター攻撃専用の判定（Hitbox）の階層
+            GameObject counterHitboxObj = new GameObject("CounterHitbox");
+            counterHitboxObj.transform.SetParent(root.transform);
+            // カウンターは強力なのでさらに広く、少し高めに配置
+            counterHitboxObj.transform.localPosition = new Vector3(1.5f, 0.5f, 0f); 
+            
+            BoxCollider2D counterHitCollider = counterHitboxObj.AddComponent<BoxCollider2D>();
+            counterHitCollider.isTrigger = true;
+            counterHitCollider.size = new Vector2(2.5f, 1.5f); // 広範囲！
+
+            Hitbox counterHitbox = counterHitboxObj.AddComponent<Hitbox>();
+            counterHitbox.damage = 30; // カウンターは高火力
+            counterHitbox.ownerPlayerID = 1;
+            counterHitboxObj.SetActive(false);
+            
+            // スクリプトに紐付け
+            characterBase.counterHitbox = counterHitbox;
 
             // 4. ステータス（CharacterStats）の自動作成とセット
             string folderPath = "Assets/ライトセーバー";

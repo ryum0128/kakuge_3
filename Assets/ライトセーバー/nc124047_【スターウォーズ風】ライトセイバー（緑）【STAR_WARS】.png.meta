@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 658e0be10bc2de542b3cebdd55f0f309
+guid: b2f9eeefa9b06aa45ad943eedb2c8b7a
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -1137498722916577873
-    second: LightsaberCharacterSprite_0
+      213: -8333996685629492970
+    second: "nc124047_\u3010\u30B9\u30BF\u30FC\u30A6\u30A9\u30FC\u30BA\u98A8\u3011\u30E9\u30A4\u30C8\u30BB\u30A4\u30D0\u30FC\uFF08\u7DD1\uFF09\u3010STAR_WARS\u3011_0"
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -100,13 +100,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: LightsaberCharacterSprite_0
+      name: "nc124047_\u3010\u30B9\u30BF\u30FC\u30A6\u30A9\u30FC\u30BA\u98A8\u3011\u30E9\u30A4\u30C8\u30BB\u30A4\u30D0\u30FC\uFF08\u7DD1\uFF09\u3010STAR_WARS\u3011_0"
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 1024
-        height: 1024
+        width: 99
+        height: 589
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -115,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: fadc81030fac630f0800000000000000
-      internalID: -1137498722916577873
+      spriteID: 61175c97b22b75c80800000000000000
+      internalID: -8333996685629492970
       vertices: []
       indices: 
       edges: []
@@ -135,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      LightsaberCharacterSprite_0: -1137498722916577873
+      "nc124047_\u3010\u30B9\u30BF\u30FC\u30A6\u30A9\u30FC\u30BA\u98A8\u3011\u30E9\u30A4\u30C8\u30BB\u30A4\u30D0\u30FC\uFF08\u7DD1\uFF09\u3010STAR_WARS\u3011_0": -8333996685629492970
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

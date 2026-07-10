@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 9e2ab57eed842b541ad201ba95e33de1
+guid: ce4c4381374252549b438d84cdc5ae1f
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -1535619013367132362
-    second: LightsaberSprite_CounterStance_0
+      213: -6981827254641702772
+    second: cloud_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -100,13 +100,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: LightsaberSprite_CounterStance_0
+      name: cloud_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 1024
-        height: 1024
+        width: 235
+        height: 68
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -115,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 63f8ae5b4a260bae0800000000000000
-      internalID: -1535619013367132362
+      spriteID: c88c0fb6a119b1f90800000000000000
+      internalID: -6981827254641702772
       vertices: []
       indices: 
       edges: []
@@ -135,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      LightsaberSprite_CounterStance_0: -1535619013367132362
+      cloud_0: -6981827254641702772
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
