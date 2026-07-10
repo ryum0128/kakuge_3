@@ -19,11 +19,11 @@ namespace FightingGameBase
     public class GannrannsuInputController : MonoBehaviour
     {
         [Header("キー設定 (インスペクターで自由に変更可能)")]
-        public Key leftKey = Key.LeftArrow;      // 左移動
-        public Key rightKey = Key.RightArrow;    // 右移動
-        public Key jumpKey = Key.UpArrow;        // ジャンプ
-        public Key normalAttackKey = Key.Z;      // 通常攻撃（ランスの突き）
-        public Key specialAttackKey = Key.X;     // 特殊攻撃（砲撃弾）
+        public Key leftKey = Key.A;              // 左移動
+        public Key rightKey = Key.D;             // 右移動
+        public Key jumpKey = Key.W;              // ジャンプ
+        public Key normalAttackKey = Key.K;      // 通常攻撃（ランスの突き）
+        public Key specialAttackKey = Key.L;     // 特殊攻撃（砲撃弾）
 
         [Header("設定")]
         [Tooltip("ZとXの同時押しと判定する猶予時間（秒）。0.05秒くらいがちょうどいいです")]
@@ -91,71 +91,52 @@ namespace FightingGameBase
             if (zDown) lastZPressTime = Time.time;
             if (xDown) lastXPressTime = Time.time;
 
-            // --- 1. ZとXの両方が押されている場合（チャージ処理） ---
+            // --- 1. ZとXの両方が押されている場合（同時押し必殺技判定） ---
             if (zPressed && xPressed)
             {
                 if (!isUltimateTriggered)
                 {
-                    if (!character.isCharging)
+                    // ZとXの両方が、同時押し猶予時間内（0.05秒以内）に押されたら竜撃砲発動判定！
+                    if (Time.time - lastZPressTime <= simultaneousPressWindow &&
+                        Time.time - lastXPressTime <= simultaneousPressWindow)
                     {
-                        // ZとXの両方が、同時押し猶予時間内（0.05秒以内）に押されたらチャージを開始！
-                        if (Time.time - lastZPressTime <= simultaneousPressWindow &&
-                            Time.time - lastXPressTime <= simultaneousPressWindow)
+                        if (character.chargeGauge >= character.maxChargeGauge)
                         {
-                            character.StartCharge();
-                            chargeTimer = 0f;
+                            character.AttackUltimate(); // ゲージ満タンなら即座に竜撃砲発射！
+                            isUltimateTriggered = true; // ボタン押しっぱなしによる連続発射を防ぐ
                             
-                            // チャージに移行したため、単発攻撃（突き・砲撃）の予約をクリアします
+                            // 同時押しが成功したため、単発攻撃（突き・砲撃）の予約をクリアします
                             lastZPressTime = -1f;
                             lastXPressTime = -1f;
                         }
-                    }
-                    else
-                    {
-                        // チャージ時間を蓄積
-                        chargeTimer += Time.deltaTime;
-                        
-                        // 設定されたチャージ時間（デフォルト1.5秒）を超えたら竜撃砲発射！
-                        if (chargeTimer >= character.chargeRequiredTime)
+                        else
                         {
-                            character.CompleteCharge();
-                            isUltimateTriggered = true; // ボタンを押しっぱなしによる重複発射を防ぐ
-                            chargeTimer = 0f;
+                            Debug.Log("竜撃砲：チャージゲージがたまっていません！");
                         }
                     }
                 }
             }
             else
             {
-                // --- 2. どちらか一方でも離された場合（チャージキャンセル） ---
-                if (character.isCharging)
-                {
-                    character.CancelCharge();
-                    chargeTimer = 0f;
-                }
-
                 // ボタンが離されたら同時押しロックを解除
                 if (Keyboard.current[normalAttackKey].wasReleasedThisFrame || Keyboard.current[specialAttackKey].wasReleasedThisFrame)
                 {
                     isUltimateTriggered = false;
                 }
 
-                // --- 3. 単発入力の処理（同時押し猶予時間が経過し、チャージしていない場合） ---
-                if (!character.isCharging)
+                // --- 2. 単発入力の処理（同時押し猶予時間が経過した場合） ---
+                // 通常攻撃 (Z) → ランスの突き
+                if (lastZPressTime > 0 && Time.time - lastZPressTime > simultaneousPressWindow)
                 {
-                    // 通常攻撃 (Z) → ランスの突き
-                    if (lastZPressTime > 0 && Time.time - lastZPressTime > simultaneousPressWindow)
-                    {
-                        character.AttackNormal();
-                        lastZPressTime = -1f;
-                    }
+                    character.AttackNormal();
+                    lastZPressTime = -1f;
+                }
 
-                    // 特殊攻撃 (X) → 砲撃弾発射
-                    if (lastXPressTime > 0 && Time.time - lastXPressTime > simultaneousPressWindow)
-                    {
-                        character.AttackSpecial();
-                        lastXPressTime = -1f;
-                    }
+                // 特殊攻撃 (X) → 砲撃弾発射
+                if (lastXPressTime > 0 && Time.time - lastXPressTime > simultaneousPressWindow)
+                {
+                    character.AttackSpecial();
+                    lastXPressTime = -1f;
                 }
             }
         }

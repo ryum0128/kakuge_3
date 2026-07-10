@@ -20,16 +20,18 @@ namespace FightingGameBase
         private float speed;          // 飛ぶスピード
         private int damage;           // この弾のダメージ
         private int ownerPlayerID;    // 誰が撃った弾か（自分に当たらないようにする）
+        private System.Action onHitCallback; // 弾が当たったときのコールバック
 
         /// <summary>
         /// 弾を初期化するメソッド。GannrannsuCharacterから呼ばれます。
         /// </summary>
-        public void Initialize(float direction, float shellSpeed, int shellDamage, int playerID)
+        public void Initialize(float direction, float shellSpeed, int shellDamage, int playerID, System.Action onHit = null)
         {
             moveDirection = direction;
             speed = shellSpeed;
             damage = shellDamage;
             ownerPlayerID = playerID;
+            onHitCallback = onHit;
 
             // 物理エンジンの設定（弾は重力で落ちないようにする）
             Rigidbody2D rb = GetComponent<Rigidbody2D>();
@@ -59,6 +61,9 @@ namespace FightingGameBase
                 // ダメージを与えます！
                 hurtbox.TakeDamage(damage);
                 Debug.Log($"砲撃弾が命中！{damage}ダメージ！");
+
+                // コールバックを呼び出します
+                onHitCallback?.Invoke();
 
                 // 弾は当たったら消えます
                 Destroy(gameObject);

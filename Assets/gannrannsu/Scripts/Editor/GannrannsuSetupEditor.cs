@@ -105,11 +105,11 @@ namespace FightingGameBase.Editor
             // ================================================================
             GameObject hitboxObj = new GameObject("LanceHitbox");
             hitboxObj.transform.SetParent(root.transform);
-            hitboxObj.transform.localPosition = new Vector3(0.9f, 0f, 0f); // ランスの先
+            hitboxObj.transform.localPosition = new Vector3(1.4f, 0f, 0f); // ランスの先
 
             BoxCollider2D hitCollider = hitboxObj.AddComponent<BoxCollider2D>();
             hitCollider.isTrigger = true;
-            hitCollider.size = new Vector2(1.0f, 0.4f); // 突き攻撃用（横に長い）
+            hitCollider.size = new Vector2(2.0f, 0.4f); // 突き攻撃用（横に長い）
 
             Hitbox hitbox = hitboxObj.AddComponent<Hitbox>();
             hitbox.damage = 12;        // 突き攻撃のダメージ

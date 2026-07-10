@@ -52,11 +52,42 @@ namespace FightingGameBase
         public float maxHoverHeight = 3f;
 
         [Header("===== 竜撃砲チャージ設定 =====")]
-        [Tooltip("竜撃砲のチャージに必要な時間（秒）")]
+        [Tooltip("竜撃砲のチャージに必要な時間（秒）（※後方互換性のため残しています。現在はチャージゲージ満タンで発動します）")]
         public float chargeRequiredTime = 1.5f;
 
-        // 現在チャージ中かどうか
+        // 現在チャージ中かどうか（※現在は使用されません）
         public bool isCharging { get; private set; }
+
+        [Header("===== 竜撃砲ゲージ設定 =====")]
+        [Tooltip("チャージゲージの最大値")]
+        public float maxChargeGauge = 100f;
+
+        [Tooltip("現在のチャージゲージ値")]
+        public float chargeGauge = 0f;
+
+        [Tooltip("1秒あたりの自動チャージ量")]
+        public float passiveChargeRate = 5f;
+
+        [Tooltip("通常攻撃（突き）が命中したときのチャージ増加量")]
+        public float normalHitChargeGain = 10f;
+
+        [Tooltip("特殊攻撃（砲撃）が命中したときのチャージ増加量")]
+        public float specialHitChargeGain = 20f;
+
+        [Header("===== 竜撃砲レーザーエフェクト設定 =====")]
+        [Tooltip("レーザーが表示される時間（秒）")]
+        public float laserDuration = 0.5f;
+
+        [Tooltip("レーザーの太さ")]
+        public float laserWidth = 0.25f;
+
+        [Tooltip("レーザーの射程（ワールド単位）")]
+        public float laserRange = 20f;
+
+        // --- GUI用テクスチャとスタイル ---
+        private Texture2D bgTex;
+        private Texture2D fillTex;
+        private GUIStyle textStyle;
 
         // --- ガンランス専用の部品参照 ---
         // ※ CharacterBase にも rb/animator がありますが private（非公開）なので、
@@ -124,8 +155,24 @@ namespace FightingGameBase
             myRb.gravityScale = 1.0f;
         }
 
-        // ※ Start() は定義しません！ → CharacterBase.Start() が自動で呼ばれて、
-        //    基底クラスの rb, animator, currentHP が正しく初期化されます。
+        // 基底クラスの Start() をオーバーライド（継承の初期化とコールバック登録）
+        void Start()
+        {
+            base.Start();
+
+            // 子オブジェクトからHitbox（通常攻撃）を取得して、命中時のコールバックを登録
+            Hitbox[] hitboxes = GetComponentsInChildren<Hitbox>(true);
+            foreach (var hb in hitboxes)
+            {
+                if (hb.gameObject.name == "LanceHitbox")
+                {
+                    hb.OnHitLanded += (hurtbox, dmg) =>
+                    {
+                        AddCharge(normalHitChargeGain);
+                    };
+                }
+            }
+        }
 
         // Update() はガンランス固有の浮遊処理を行います。
         // ※ これにより CharacterBase.Update() は隠れますが、
@@ -149,6 +196,95 @@ namespace FightingGameBase
                 myAnimator.SetBool("IsGrounded", isGrounded);
                 myAnimator.SetBool("IsHovering", isHovering);
             }
+
+            // --- チャージゲージの自動蓄積 ---
+            AddCharge(passiveChargeRate * Time.deltaTime);
+        }
+
+        // チャージを増減させる関数
+        public void AddCharge(float amount)
+        {
+            if (isDead) return;
+            chargeGauge = Mathf.Clamp(chargeGauge + amount, 0f, maxChargeGauge);
+        }
+
+        // --- GUI表示用の設定 ---
+        private void InitTextures()
+        {
+            if (bgTex == null)
+            {
+                bgTex = MakeTex(2, 2, new Color(0f, 0f, 0f, 0.6f)); // 半透明の黒背景
+            }
+            if (fillTex == null)
+            {
+                fillTex = MakeTex(2, 2, Color.orange); // オレンジ色のゲージ
+            }
+            if (textStyle == null)
+            {
+                textStyle = new GUIStyle();
+                textStyle.fontSize = 12;
+                textStyle.fontStyle = FontStyle.Bold;
+                textStyle.normal.textColor = Color.white;
+                textStyle.alignment = TextAnchor.MiddleCenter;
+            }
+        }
+
+        private Texture2D MakeTex(int width, int height, Color col)
+        {
+            Color[] pix = new Color[width * height];
+            for (int i = 0; i < pix.Length; ++i)
+            {
+                pix[i] = col;
+            }
+            Texture2D result = new Texture2D(width, height);
+            result.SetPixels(pix);
+            result.Apply();
+            return result;
+        }
+
+        void OnDestroy()
+        {
+            if (bgTex != null) Destroy(bgTex);
+            if (fillTex != null) Destroy(fillTex);
+        }
+
+        // 画面上にチャージゲージを綺麗に表示します
+        void OnGUI()
+        {
+            if (isDead) return;
+            InitTextures();
+
+            // プレイヤーIDに応じて表示位置を左右に振り分けます
+            float width = 200f;
+            float height = 20f;
+            float x = (playerID == 1) ? 20f : Screen.width - width - 20f;
+            float y = 90f; // 体力ゲージの下付近
+
+            // 背景描画
+            GUI.DrawTexture(new Rect(x, y, width, height), bgTex);
+
+            // ゲージの割合幅を計算
+            float fillRatio = chargeGauge / maxChargeGauge;
+            float fillWidth = (width - 4f) * fillRatio;
+            
+            Color barColor = Color.orange;
+            string text = $"竜撃砲 CHARGE: {Mathf.Floor(chargeGauge)}%";
+            
+            // 満タン時のピカピカ点滅エフェクト
+            if (chargeGauge >= maxChargeGauge)
+            {
+                float flash = Mathf.PingPong(Time.time * 4f, 1f);
+                barColor = Color.Lerp(new Color(1f, 0.3f, 0f), new Color(1f, 0.9f, 0f), flash);
+                text = "竜撃砲 READY! (Z+X)";
+            }
+            
+            // ゲージ描画
+            GUI.color = barColor;
+            GUI.DrawTexture(new Rect(x + 2f, y + 2f, fillWidth, height - 4f), fillTex);
+            GUI.color = Color.white; // リセット
+
+            // テキスト表示
+            GUI.Label(new Rect(x, y, width, height), text, textStyle);
         }
 
         // =========================================================
@@ -208,6 +344,9 @@ namespace FightingGameBase
         {
             if (isDead) return;
 
+            // 必殺技発動時にゲージを消費してゼロに戻す
+            chargeGauge = 0f;
+
             if (myAnimator != null) myAnimator.SetTrigger("AttackUltimate");
             Debug.Log("ガンランス：竜撃砲発動！！！");
 
@@ -241,6 +380,117 @@ namespace FightingGameBase
             // --- 反動で後ろに吹っ飛びます ---
             float recoilDirection = -Mathf.Sign(transform.localScale.x);
             myRb.AddForce(new Vector2(recoilDirection * dragonBlastRecoil, 2f), ForceMode2D.Impulse);
+
+            // --- 赤いレーザーエフェクトを発射！ ---
+            FireLaserEffect();
+        }
+
+        // =========================================================
+        // 竜撃砲の赤いレーザーエフェクト（LineRenderer を使用）
+        // =========================================================
+        private void FireLaserEffect()
+        {
+            StartCoroutine(LaserCoroutine());
+        }
+
+        private System.Collections.IEnumerator LaserCoroutine()
+        {
+            // レーザーを担うGameObjectを動的に作成
+            GameObject laserObj = new GameObject("DragonBlastLaser");
+            LineRenderer lr = laserObj.AddComponent<LineRenderer>();
+
+            // 発射方向（キャラクターの向き）
+            float dir = Mathf.Sign(transform.localScale.x);
+
+            // =============================================
+            // 当たり判定（DragonBlastHitbox）からサイズを計算
+            // =============================================
+            float hitboxSizeX = laserRange;  // フォールバック用
+            float hitboxSizeY = laserWidth;  // フォールバック用
+            float hitboxStartX = 0f;         // キャラクターからの開始オフセット（ローカル）
+
+            if (dragonBlastHitbox != null)
+            {
+                BoxCollider2D col = dragonBlastHitbox.GetComponent<BoxCollider2D>();
+                if (col != null)
+                {
+                    // Boundsはワールド空間（スケール込み）
+                    Bounds b = col.bounds;
+                    hitboxSizeY = b.size.y;  // レーザーの太さ = ヒットボックスの高さ
+                    hitboxSizeX = b.size.x;  // レーザーの長さ = ヒットボックスの幅
+
+                    // 開始・終了位置をヒットボックスの左端・右端に合わせる
+                    // dir > 0（右向き）なら左端がstart、右端がend
+                    hitboxStartX = (dir > 0) ? b.min.x : b.max.x;
+                }
+            }
+
+            // LineRenderer の初期設定
+            lr.positionCount = 2;
+            lr.useWorldSpace = true;
+            lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            lr.receiveShadows = false;
+
+            // マテリアル（組み込みのSprites/Defaultで色が乗る）
+            lr.material = new Material(Shader.Find("Sprites/Default"));
+
+            // アニメーションループ
+            float elapsed = 0f;
+            while (elapsed < laserDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / laserDuration; // 0→1
+
+                // ちらつき（フリッカー）
+                float flicker = 1f - Mathf.PerlinNoise(elapsed * 30f, 0f) * 0.3f;
+
+                // 色：赤→オレンジに推移して、時間とともに透明にフェード
+                float alpha = (1f - t) * flicker;
+                lr.startColor = new Color(1f, Mathf.Lerp(0f,  0.3f, t), 0f, alpha);
+                lr.endColor   = new Color(1f, Mathf.Lerp(0.2f, 0.6f, t), 0f, alpha * 0.4f);
+
+                // 太さも時間とともに細くなる（ヒットボックスの高さに合わせてスタート）
+                float currentWidth = hitboxSizeY * (1f - t * 0.5f) * flicker;
+                lr.startWidth = currentWidth;
+                lr.endWidth   = currentWidth; // 均一にしてヒットボックスの高さと合わせる
+
+                // =========================================
+                // 位置：ヒットボックスのboundsを毎フレーム再取得（キャラが動いても追従）
+                // =========================================
+                Vector3 startPos, endPos;
+                if (dragonBlastHitbox != null)
+                {
+                    BoxCollider2D col = dragonBlastHitbox.GetComponent<BoxCollider2D>();
+                    if (col != null)
+                    {
+                        Bounds b = col.bounds;
+                        // dir > 0 なら右向き：左端→右端、左向き：右端→左端
+                        startPos = new Vector3((dir > 0) ? b.min.x : b.max.x, b.center.y, 0f);
+                        endPos   = new Vector3((dir > 0) ? b.max.x : b.min.x, b.center.y, 0f);
+                    }
+                    else
+                    {
+                        // fallback
+                        Vector3 fp = firePoint != null ? firePoint.position : transform.position;
+                        startPos = fp;
+                        endPos   = fp + new Vector3(dir * hitboxSizeX, 0f, 0f);
+                    }
+                }
+                else
+                {
+                    Vector3 fp = firePoint != null ? firePoint.position : transform.position;
+                    startPos = fp;
+                    endPos   = fp + new Vector3(dir * hitboxSizeX, 0f, 0f);
+                }
+
+                lr.SetPosition(0, startPos);
+                lr.SetPosition(1, endPos);
+
+                yield return null;
+            }
+
+            // レーザー消去
+            Destroy(laserObj);
         }
 
         // 一定時間後にダメージを元に戻すコルーチン

@@ -26,7 +26,7 @@ namespace FightingGameBase
         private Rigidbody2D rb;      // 物理エンジン（重力や移動を計算する機能）
         private Animator animator;   // アニメーションを再生する機能
 
-        void Start()
+        protected virtual void Start()
         {
             // 自分自身についている Rigidbody2D を取得します
             rb = GetComponent<Rigidbody2D>();

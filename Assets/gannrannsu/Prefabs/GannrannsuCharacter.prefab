@@ -31,6 +31,99 @@ Transform:
   m_Children: []
   m_Father: {fileID: 4282521666831817961}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &4418878614785265786
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7263919594959288214}
+  - component: {fileID: 1977049955905043490}
+  - component: {fileID: 6176574109713441994}
+  m_Layer: 0
+  m_Name: DragonBlastHitbox
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!4 &7263919594959288214
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4418878614785265786}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 2.5, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 4282521666831817961}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!61 &1977049955905043490
+BoxCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4418878614785265786}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_IsTrigger: 1
+  m_UsedByEffector: 0
+  m_CompositeOperation: 0
+  m_CompositeOrder: 0
+  m_Offset: {x: 0, y: 0}
+  m_SpriteTilingProperty:
+    border: {x: 0, y: 0, z: 0, w: 0}
+    pivot: {x: 0, y: 0}
+    oldSize: {x: 0, y: 0}
+    newSize: {x: 0, y: 0}
+    adaptiveTilingThreshold: 0
+    drawMode: 0
+    adaptiveTiling: 0
+  m_AutoTiling: 0
+  m_Size: {x: 5, y: 1.8}
+  m_EdgeRadius: 0
+--- !u!114 &6176574109713441994
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4418878614785265786}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f6069def85c90764c9c3adec27a91ff0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FightingGameBase.Hitbox
+  damage: 40
+  ownerPlayerID: 1
 --- !u!1 &5430184848134747816
 GameObject:
   m_ObjectHideFlags: 0
@@ -182,6 +275,7 @@ Transform:
   - {fileID: 8745432571928112649}
   - {fileID: 8791138977923006493}
   - {fileID: 926659215820058571}
+  - {fileID: 7263919594959288214}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!50 &1109545168590489251
@@ -267,6 +361,7 @@ MonoBehaviour:
   isDead: 0
   shellPrefab: {fileID: 3266458248738474479, guid: 89745e7bf172a5c46aab34c8808a98b9, type: 3}
   firePoint: {fileID: 8791138977923006493}
+  dragonBlastHitbox: {fileID: 4418878614785265786}
   shellSpeed: 12
   shellDamage: 15
   dragonBlastDamage: 40
@@ -274,6 +369,14 @@ MonoBehaviour:
   hoverForce: 15
   maxHoverHeight: 3
   chargeRequiredTime: 1.5
+  maxChargeGauge: 100
+  chargeGauge: 0
+  passiveChargeRate: 5
+  normalHitChargeGain: 10
+  specialHitChargeGain: 20
+  laserDuration: 0.5
+  laserWidth: 0.25
+  laserRange: 20
 --- !u!114 &2077194006783114719
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -299,11 +402,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f0df6521caf5b2b4e96431c00b42e697, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FightingGameBase.GannrannsuInputController
-  leftKey: 61
-  rightKey: 62
-  jumpKey: 63
-  normalAttackKey: 40
-  specialAttackKey: 38
+  leftKey: 15
+  rightKey: 18
+  jumpKey: 37
+  normalAttackKey: 25
+  specialAttackKey: 26
   simultaneousPressWindow: 0.05
 --- !u!1 &9028395817959419299
 GameObject:
@@ -332,7 +435,7 @@ Transform:
   m_GameObject: {fileID: 9028395817959419299}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.9, y: 0, z: 0}
+  m_LocalPosition: {x: 1.4, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -382,7 +485,7 @@ BoxCollider2D:
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 1, y: 0.4}
+  m_Size: {x: 2, y: 0.4}
   m_EdgeRadius: 0
 --- !u!114 &3056464304714459430
 MonoBehaviour:

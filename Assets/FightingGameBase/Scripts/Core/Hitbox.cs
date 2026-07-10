@@ -17,6 +17,9 @@ namespace FightingGameBase
         [Tooltip("誰の攻撃判定か（1ならプレイヤー1。自分自身には当たらないようにするためです）")]
         public int ownerPlayerID = 1;
 
+        // 攻撃が相手に当たったときに呼び出されるコールバック
+        public System.Action<Hurtbox, int> OnHitLanded;
+
         // OnTriggerEnter2D は、この「攻撃判定」が「他の誰かの判定」に重なった瞬間に
         // Unityが自動的に呼び出してくれる便利なメソッド（機能）です！
         private void OnTriggerEnter2D(Collider2D other)
@@ -29,6 +32,9 @@ namespace FightingGameBase
             {
                 // 相手にダメージを与えます！
                 hurtbox.TakeDamage(damage);
+                
+                // 攻撃が当たったことを通知します
+                OnHitLanded?.Invoke(hurtbox, damage);
                 
                 // 【改造のヒント】
                 // もし「攻撃が当たったときに火花を出したい！」「ドカンという音を鳴らしたい！」
