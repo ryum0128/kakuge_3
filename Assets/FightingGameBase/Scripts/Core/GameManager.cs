@@ -42,6 +42,13 @@ namespace FightingGameBase
 
         void Start()
         {
+            // HUDManagerを動的に生成して動作させる
+            if (FindAnyObjectByType<HUDManager>() == null)
+            {
+                GameObject hudGo = new GameObject("HUDManager");
+                hudGo.AddComponent<HUDManager>();
+            }
+
             // 実際はここで「Round 1... Fight!」などのUI演出を行いますが、
             // 今はテスト用なのですぐに試合を開始します！
             StartBattle();

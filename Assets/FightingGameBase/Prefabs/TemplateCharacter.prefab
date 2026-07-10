@@ -323,9 +323,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FightingGameBase.CharacterBase
   stats: {fileID: 11400000, guid: ed4851ab1eba45748ab8d461646db8e2, type: 2}
   playerID: 1
+  maxHP: 100
   currentHP: 0
   isGrounded: 0
   isDead: 0
+  isStunned: 0
+  maxPosture: 100
+  currentPosture: 0
+  postureRegenSpeed: 20
+  maxMana: 100
+  currentMana: 50
+  manaRegenSpeed: 8
+  isBlockingState: 0
 --- !u!114 &7668691471252363820
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -351,9 +360,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7db0026401e3c6848831e420317953ee, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FightingGameBase.PlayerInputController
-  leftKey: 61
-  rightKey: 62
-  jumpKey: 63
-  normalAttackKey: 40
-  specialAttackKey: 38
+  leftKey: 15
+  rightKey: 18
+  jumpKey: 1
+  normalAttackKey: 24
+  specialAttackKey: 25
+  blockKey: 22
   simultaneousPressWindow: 0.05

@@ -40,8 +40,8 @@ namespace FightingGameBase
 
         void Update()
         {
-            // キャラクターがいない、または倒れている場合は入力を受け付けません
-            if (character == null || character.isDead) return;
+            // キャラクターがいない、または倒れている場合やスタン中は入力を受け付けません
+            if (character == null || character.isDead || character.isStunned) return;
             
             // キーボードが接続されていない場合も何もしません
             if (Keyboard.current == null) return;

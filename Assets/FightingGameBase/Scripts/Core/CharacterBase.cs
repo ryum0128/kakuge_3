@@ -1,91 +1,105 @@
 using UnityEngine;
+using System.Collections;
 
 namespace FightingGameBase
 {
-    // =================================================================================
-    // 【CharacterBase（キャラクターの基本システム）】
-    // このスクリプトはキャラクターの「体力」「移動」「ジャンプ」「攻撃」といった
-    // 根本的な仕組みをまとめたものです。
-    // =================================================================================
+    // Base class for all characters in the game.
     [RequireComponent(typeof(Rigidbody2D))]
     public class CharacterBase : MonoBehaviour
     {
-        [Header("キャラクター設定")]
-        [Tooltip("ステータス（体力やスピード）の設定データファイル")]
-        public CharacterStats stats; // CharacterStatsスクリプタブルオブジェクトをセットします
-        
-        [Tooltip("プレイヤー番号（1なら1P、2なら2P）")]
-        public int playerID = 1; 
+        [Header("Character Configurations")]
+        public CharacterStats stats;
+        public int playerID = 1;
 
-        [Header("現在の状態（ゲーム中に変化します）")]
-        public int currentHP;        // 今の体力
-        public bool isGrounded;      // 地面に足がついているか（trueならジャンプ可能）
-        public bool isDead;          // 倒れているか
+        [Header("Character Stats")]
+        public int maxHP = 100;
+        public int currentHP;
+        public bool isGrounded;
+        public bool isDead;
+        public bool isStunned = false;
 
-        // --- プログラム内で使う部品（コンポーネント） ---
-        private Rigidbody2D rb;      // 物理エンジン（重力や移動を計算する機能）
-        protected Animator animator;   // アニメーションを再生する機能
+        [Header("DeepWoken Posture & Mana Settings")]
+        public float maxPosture = 100f;
+        public float currentPosture = 0f;
+        public float postureRegenSpeed = 20f;
+        public float maxMana = 100f;
+        public float currentMana = 50f; // Starts with 50 Mana
+        public float manaRegenSpeed = 8f; // Mana recovery speed per second
+        public bool isBlockingState = false;
+
+        protected Rigidbody2D rb;
+        protected Animator animator;
 
         protected virtual void Start()
         {
-            // 自分自身についている Rigidbody2D を取得します
             rb = GetComponent<Rigidbody2D>();
-            
-            // 子オブジェクト（Visualsなど）についている Animator を取得します
-            animator = GetComponentInChildren<Animator>(); 
+            animator = GetComponentInChildren<Animator>();
             if (animator != null && animator.runtimeAnimatorController == null)
             {
                 animator = null;
             }
-            
-            // もしステータス（CharacterStats）がセットされていれば、最初の体力を最大HPにします
+
             if (stats != null)
             {
-                currentHP = stats.maxHP;
+                maxHP = stats.maxHP;
+            }
+            currentHP = maxHP;
+
+            // Auto-instantiate HUDManager if it's missing in the scene
+            if (FindAnyObjectByType<HUDManager>() == null)
+            {
+                GameObject hudGo = new GameObject("HUDManager");
+                hudGo.AddComponent<HUDManager>();
+            }
+
+            // Sync all child Hitboxes to this character's playerID to guarantee no owner ID mismatch issues
+            Hitbox[] hitboxes = GetComponentsInChildren<Hitbox>(true);
+            foreach (Hitbox h in hitboxes)
+            {
+                h.ownerPlayerID = playerID;
             }
         }
 
-        void Update()
+        protected virtual void Update()
         {
-            // すでに倒れているか、またはゲームが始まっていない場合は何もせず終了します
-            if (isDead || GameManager.Instance != null && !GameManager.Instance.IsPlaying) return;
+            if (isDead || (GameManager.Instance != null && !GameManager.Instance.IsPlaying)) return;
 
-            // --- 接地判定（地面にいるかどうか） ---
-            // Y軸の速度（上下の動き）が 0.1 より小さければ、地面にいるとみなします。
-            // （Unityの物理演算のブレを考慮して少し余裕を持たせています）
+            // Ground check (based on vertical velocity threshold)
             isGrounded = Mathf.Abs(rb.linearVelocity.y) < 0.1f;
-            
-            // アニメーターがあれば、地面にいるかどうかを伝えます（落下アニメーションなどのため）
+
             if (animator != null)
             {
                 animator.SetBool("IsGrounded", isGrounded);
             }
+
+            // Natural posture recovery when not blocking
+            if (!isBlockingState && currentPosture > 0f)
+            {
+                currentPosture -= postureRegenSpeed * Time.deltaTime;
+                if (currentPosture < 0f) currentPosture = 0f;
+            }
+
+            // Natural mana recovery
+            if (currentMana < maxMana)
+            {
+                currentMana += manaRegenSpeed * Time.deltaTime;
+                if (currentMana > maxMana) currentMana = maxMana;
+            }
         }
 
-        // =========================================================
-        // アクション（移動・ジャンプ・攻撃など）
-        // ※ここは PlayerInputController（入力）から呼ばれます
-        // =========================================================
-
-        public void Move(float direction)
+        public virtual void Move(float direction)
         {
-            if (isDead) return;
+            if (isDead || isStunned) return;
 
-            // direction は -1(左) から 1(右) の値になります。
-            // statsがセットされていなければ、仮のスピード「5」を使います。
             float speed = stats != null ? stats.moveSpeed : 5f;
-            
-            // 物理エンジンを使って、キャラクターを左右に動かします（Y軸の落下速度はそのまま）
             rb.linearVelocity = new Vector2(direction * speed, rb.linearVelocity.y);
 
-            // キャラクターの向き（画像）を反転する処理
+            // Flip sprite depending on direction
             if (direction != 0)
             {
-                // 右(1)か左(-1)に合わせて、スケール（大きさ）のXのプラスマイナスを切り替えます
                 transform.localScale = new Vector3(Mathf.Sign(direction), 1, 1);
             }
 
-            // アニメーターに「今どれくらいの速さで動いているか」を伝えます（歩きアニメーションのため）
             if (animator != null)
             {
                 animator.SetFloat("Speed", Mathf.Abs(direction));
@@ -94,86 +108,64 @@ namespace FightingGameBase
 
         public void Jump()
         {
-            // 倒れているか、または空中にいるときはジャンプできません
-            if (isDead || !isGrounded) return;
+            if (isDead || !isGrounded || isStunned) return;
 
-            // statsがセットされていなければ、仮のジャンプ力「12」を使います。
             float force = stats != null ? stats.jumpForce : 12f;
-            
-            // 上方向（Y軸）に力を加えてジャンプさせます
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, force);
-            
-            // ジャンプのアニメーションを再生するように伝えます
+
             if (animator != null)
             {
                 animator.SetTrigger("Jump");
             }
         }
 
-        // --- 攻撃処理 ---
-        
         public virtual void AttackNormal()
         {
-            if (isDead) return;
-            
-            // 通常攻撃のアニメーションを再生
-            if (animator != null) animator.SetTrigger("AttackNormal");
-            Debug.Log("通常攻撃発動！");
+            if (isDead || isStunned) return;
 
-            // 子オブジェクトからHitbox（攻撃判定）を探して、一時的にオン（有効）にします！
+            if (animator != null) animator.SetTrigger("AttackNormal");
+            Debug.Log("Normal attack triggered.");
+
             Hitbox hitbox = GetComponentInChildren<Hitbox>(true);
             if (hitbox != null)
             {
-                // コルーチンという機能を使って、0.2秒間だけ判定を出します
                 StartCoroutine(ActivateHitboxTemporarily(hitbox.gameObject, 0.2f));
             }
         }
 
-        // 時間差で処理を行うための仕組み（コルーチン）です
-        protected System.Collections.IEnumerator ActivateHitboxTemporarily(GameObject hitboxObj, float duration)
+        protected IEnumerator ActivateHitboxTemporarily(GameObject hitboxObj, float duration)
         {
-            hitboxObj.SetActive(true); // 攻撃判定を出す（赤い箱が現れる）
-            yield return new WaitForSeconds(duration); // 指定した時間（今回は0.2秒）だけ待つ
-            hitboxObj.SetActive(false); // 攻撃判定を消す
+            hitboxObj.SetActive(true);
+            yield return new WaitForSeconds(duration);
+            hitboxObj.SetActive(false);
         }
 
         public virtual void AttackSpecial()
         {
-            if (isDead) return;
-            
-            // 特殊攻撃のアニメーションを再生
+            if (isDead || isStunned) return;
             if (animator != null) animator.SetTrigger("AttackSpecial");
-            Debug.Log("特殊攻撃発動！");
+            Debug.Log("Special attack triggered.");
         }
 
         public void AttackUltimate()
         {
-            if (isDead) return;
-            
-            // 必殺技のアニメーションを再生
+            if (isDead || isStunned) return;
             if (animator != null) animator.SetTrigger("AttackUltimate");
-            Debug.Log("必殺攻撃（同時押し）発動！！");
+            Debug.Log("Ultimate attack triggered.");
         }
-
-        // =========================================================
-        // ダメージとゲームオーバーの処理
-        // =========================================================
 
         public virtual void TakeDamage(int damage)
         {
             if (isDead) return;
 
-            // ダメージの分だけ体力を減らします
             currentHP -= damage;
-            if (currentHP < 0) currentHP = 0; // 体力がマイナスにならないようにする
+            if (currentHP < 0) currentHP = 0;
 
-            // ダメージを受けたアニメーションを再生します
             if (animator != null)
             {
                 animator.SetTrigger("Damage");
             }
 
-            // 体力がゼロになったら倒れる処理（Die）へ進みます
             if (currentHP == 0)
             {
                 Die();
@@ -182,29 +174,34 @@ namespace FightingGameBase
 
         private void Die()
         {
-            isDead = true; // 倒れたフラグをオンにする
-            
-            // 倒れるアニメーションを再生します
+            isDead = true;
+
             if (animator != null)
             {
                 animator.SetBool("IsDead", true);
             }
-            
-            // GameManager（試合を管理するシステム）に、自分が倒れたことを通知します
+
             if (GameManager.Instance != null)
             {
                 GameManager.Instance.OnCharacterDied(playerID);
             }
         }
 
-        // =========================================================
-        // ブロック・パリー（子クラスでオーバーライドして実装）
-        // =========================================================
-
-        // ブロックキーを押し始めたときに呼ばれます
         public virtual void StartBlock() { }
-
-        // ブロックキーを離したときに呼ばれます
         public virtual void StopBlock() { }
+
+        public virtual void Stun(float duration)
+        {
+            if (isDead) return;
+            StartCoroutine(StunRoutine(duration));
+        }
+
+        private IEnumerator StunRoutine(float duration)
+        {
+            isStunned = true;
+            if (animator != null) animator.SetTrigger("Damage");
+            yield return new WaitForSeconds(duration);
+            isStunned = false;
+        }
     }
 }

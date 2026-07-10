@@ -3,100 +3,175 @@ using System.Collections;
 
 namespace FightingGameBase
 {
-    // =================================================================================
-    // 【TaikenCharacter（大剣キャラクター用のカスタム挙動）】
-    // CharacterBase を継承し、大剣に特化した攻撃モーションと判定制御を行います。
-    // 通常攻撃時に、見た目のオブジェクトをプログラムで素早く振り下ろし、ゆっくり戻します。
-    // =================================================================================
+    // Custom behavior for Taiken (Greatsword) character.
     public class TaikenCharacter : CharacterBase
     {
-        [Header("大剣の攻撃モーション設定")]
-        [Tooltip("振り下ろし開始時の回転角度")]
+        [Header("Taiken Swing Settings")]
+        [Tooltip("Rotation angle at the start of swing.")]
         public float swingStartAngle = 45f;
-        [Tooltip("振り下ろしきった時の回転角度")]
+        [Tooltip("Rotation angle at the end of swing.")]
         public float swingEndAngle = -90f;
-        [Tooltip("振り下ろしにかかる時間（秒）")]
+        [Tooltip("Duration of the swing down phase.")]
         public float swingDuration = 0.12f;
-        [Tooltip("元の位置に戻る時間（秒）")]
+        [Tooltip("Duration of the recover phase.")]
         public float recoverDuration = 0.28f;
+
+        [Header("DeepWoken Block Settings")]
+        public float guardBreakDuration = 1.5f; // Stun duration when guard is broken
+        private bool isGuardBroken = false;
+
+        // Verified weapon parameters to guarantee correct visual sizes using Sliced Sprite size
+        private readonly Vector2 normalWeaponSize = new Vector2(1.2f, 0.8f);
+        private readonly Vector3 normalWeaponPos = new Vector3(0.7f, 0.6f, 0f);
+        private readonly Vector2 specialWeaponSize = new Vector2(2.5f, 1.0f);
+        private readonly Vector3 specialWeaponPos = new Vector3(1.6f, 0.6f, 0f);
 
         private Transform visualsTransform;
         private bool isSwinging = false;
+        private bool isSpecialSwinging = false;
+        private GameObject blockShield;
 
-        void Start()
+        // DeepWoken Parry Cooldown variables
+        private float lastParryTime = -10f;
+        private float parryCooldown = 0.35f;
+
+        protected override void Start()
         {
-            // 親クラス (CharacterBase) の初期設定を実行
             base.Start();
-            
-            // 診断用ログ: アタッチされているオブジェクト名と子オブジェクトをコンソールに出力します
-            System.Text.StringBuilder sb = new System.Text.StringBuilder();
-            foreach (Transform child in transform)
-            {
-                sb.Append(child.name).Append(" (Active: ").Append(child.gameObject.activeSelf).Append("), ");
-            }
-            string childrenList = sb.Length > 0 ? sb.ToString().TrimEnd(' ', ',') : "(子オブジェクトなし)";
-            Debug.Log($"<b>[TaikenCharacter 診断]</b> アタッチ先オブジェクト: <color=yellow>'{gameObject.name}'</color> | 子オブジェクト一覧: <color=cyan>{childrenList}</color>");
 
-            // 子要素から HoverEffect コンポーネントを探して、見た目（Visuals）のオブジェクトを特定します
-            HoverEffect hover = GetComponentInChildren<HoverEffect>(true);
-            if (hover != null)
+            // Locate the weapon visual object (Visuals/Weapon) for swing rotations.
+            visualsTransform = transform.Find("Visuals/Weapon");
+            if (visualsTransform == null)
             {
-                visualsTransform = hover.transform;
-            }
-            else
-            {
-                // バックアップとして名前で検索します
-                visualsTransform = transform.Find("Visuals");
+                HoverEffect hover = GetComponentInChildren<HoverEffect>(true);
+                if (hover != null)
+                {
+                    visualsTransform = hover.transform;
+                }
+                else
+                {
+                    visualsTransform = transform.Find("Visuals");
+                }
             }
 
             if (visualsTransform == null)
             {
-                Debug.LogError($"<b>TaikenCharacter エラー</b>: 大剣の見た目オブジェクト（Visuals）が見つかりませんでした！\n" +
-                               $"・アタッチされているオブジェクト: '{gameObject.name}'\n" +
-                               $"・検知された子オブジェクト: {childrenList}\n" +
-                               $"・対策: 生成メニューを再実行し、新しく生成されたプレハブを配置し直してください。");
+                Debug.LogError($"[TaikenCharacter] 'Visuals' or 'HoverEffect' not found on {gameObject.name}");
+            }
+            else
+            {
+                // Forcibly apply correct normal size and position at start using Sliced Sprite.size
+                visualsTransform.localPosition = normalWeaponPos;
+                visualsTransform.localScale = Vector3.one; // Keep scale at 1.0
+
+                SpriteRenderer weaponSr = visualsTransform.GetComponent<SpriteRenderer>();
+                if (weaponSr != null)
+                {
+                    weaponSr.drawMode = SpriteDrawMode.Sliced;
+                    weaponSr.size = normalWeaponSize;
+                }
+            }
+
+            // Find the block shield GameObject using deep search to avoid hierarchy mismatch.
+            Transform shieldTrans = FindDeepChild(transform, "BlockShield");
+            if (shieldTrans != null)
+            {
+                blockShield = shieldTrans.gameObject;
+                blockShield.SetActive(false);
+            }
+            else
+            {
+                // Fallback: If not pre-configured in prefab, create it dynamically using character's sprite.
+                Transform parent = visualsTransform != null ? visualsTransform.parent : transform;
+                GameObject shield = new GameObject("BlockShield");
+                shield.transform.SetParent(parent);
+                shield.transform.localScale = new Vector3(0.45f, 0.45f, 1f);
+                shield.transform.localPosition = new Vector3(0.2f, 0.2f, 0f);
+
+                SpriteRenderer shieldSr = shield.AddComponent<SpriteRenderer>();
+                SpriteRenderer charSr = GetComponentInChildren<SpriteRenderer>();
+                if (charSr != null)
+                {
+                    shieldSr.sprite = charSr.sprite;
+                    shieldSr.drawMode = SpriteDrawMode.Sliced;
+                }
+                shieldSr.color = new Color(0.3f, 0.8f, 1f, 0.55f);
+                shieldSr.sortingOrder = 1;
+
+                blockShield = shield;
+                blockShield.SetActive(false);
             }
         }
 
-        // 通常攻撃（AttackNormal）を大剣仕様に上書き（override）します！
+        private Transform FindDeepChild(Transform parent, string name)
+        {
+            foreach (Transform child in parent)
+            {
+                if (child.name == name) return child;
+                Transform found = FindDeepChild(child, name);
+                if (found != null) return found;
+            }
+            return null;
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+            if (isDead)
+            {
+                if (blockShield != null && blockShield.activeSelf)
+                {
+                    blockShield.SetActive(false);
+                }
+                return;
+            }
+        }
+
+        public override void Move(float direction)
+        {
+            if (isSpecialSwinging || isGuardBroken)
+            {
+                if (rb != null)
+                {
+                    rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+                }
+                return;
+            }
+            base.Move(direction);
+        }
+
+        // Override AttackNormal for Taiken custom swing.
         public override void AttackNormal()
         {
-            if (isDead || isSwinging) return;
+            if (isDead || isSwinging || isBlocking || isGuardBroken) return;
 
-            Debug.Log("大剣・通常攻撃（振り下ろし）発動！");
+            Debug.Log("Taiken Normal Attack triggered.");
             
-            // アニメーターがセットされていれば、トリガーをセット
             if (animator != null)
             {
                 animator.SetTrigger("AttackNormal");
             }
 
-            // 通常より少し広い範囲を攻撃するため、コルーチンで大剣専用のタイミングで判定を出します
             Hitbox hitbox = GetComponentInChildren<Hitbox>(true);
             if (hitbox != null)
             {
-                // 振り下ろし動作（0.12秒）の少し後まで当たり判定が残るように0.22秒間に設定
                 StartCoroutine(ActivateHitboxTemporarily(hitbox.gameObject, 0.22f));
             }
 
-            // プログラム制御による振り下ろしモーションを開始
             StartCoroutine(SwingRoutine());
         }
 
-        // 振り下ろしを表現するコルーチン
         private IEnumerator SwingRoutine()
         {
             isSwinging = true;
-            Debug.Log("大剣アニメーション: 振り下ろし開始！");
+            Debug.Log("Taiken animation: swing start.");
             float elapsed = 0f;
 
-            // 1. 素早く振り下ろす (swingStartAngle -> swingEndAngle)
+            // 1. Swing down phase
             while (elapsed < swingDuration)
             {
                 elapsed += Time.deltaTime;
                 float t = elapsed / swingDuration;
-                
-                // 加速しながら振り下ろすイージング効果
                 t = t * t; 
                 
                 float angle = Mathf.Lerp(swingStartAngle, swingEndAngle, t);
@@ -107,25 +182,19 @@ namespace FightingGameBase
                 yield return null;
             }
 
-            // 完全に振り下ろした角度に固定
             if (visualsTransform != null)
             {
                 visualsTransform.localRotation = Quaternion.Euler(0, 0, swingEndAngle);
             }
             
-            // 振り切った状態で一瞬（0.04秒）静止させて重厚感を出す
             yield return new WaitForSeconds(0.04f);
 
-            Debug.Log("大剣アニメーション: 元の位置に戻し始めます。");
-
-            // 2. ゆっくりと元の角度（0度）に戻す
+            // 2. Recover phase
             elapsed = 0f;
             while (elapsed < recoverDuration)
             {
                 elapsed += Time.deltaTime;
                 float t = elapsed / recoverDuration;
-                
-                // 減速しながら滑らかに戻るイージング効果
                 t = Mathf.Sin(t * Mathf.PI * 0.5f);
                 
                 float angle = Mathf.Lerp(swingEndAngle, 0f, t);
@@ -136,61 +205,71 @@ namespace FightingGameBase
                 yield return null;
             }
 
-            // 完全に元の状態にリセット
             if (visualsTransform != null)
-            {
                 visualsTransform.localRotation = Quaternion.identity;
-            }
-            Debug.Log("大剣アニメーション: 元の位置に戻りました。");
+
+            Debug.Log("Taiken animation: swing completed.");
             isSwinging = false;
         }
 
-        // =========================================================
-        // 特殊攻撃: 溜め斬り（ChargedSlash）
-        // Kキーを押すと大剣を後ろに大きく引いて溜め、
-        // 一気に超高速で前方に振り抜くパワー全開の一撃！
-        // =========================================================
-
-        [Header("溜め斬り設定")]
-        [Tooltip("溜めフェーズの時間（秒）")]
+        [Header("Taiken Special Attack Settings")]
+        [Tooltip("Duration of the charging phase.")]
         public float chargeWindupDuration = 0.7f;
-
-        [Tooltip("溜め時の引き角度（大きく引くほど予備動作が大きく見える）")]
+        [Tooltip("Weapon rotation angle during charge.")]
         public float chargeWindupAngle = 120f;
-
-        [Tooltip("解放フェーズの時間（秒）- 短いほど速く激しく見える")]
+        [Tooltip("Duration of the release swing phase.")]
         public float chargeReleaseDuration = 0.06f;
-
-        [Tooltip("解放後の振り抜き角度")]
+        [Tooltip("Weapon rotation angle after release.")]
         public float chargeReleaseAngle = -130f;
-
-        [Tooltip("溜め斬りのダメージ（通常攻撃より大きく設定）")]
+        [Tooltip("Damage of the special attack.")]
         public int chargeSlashDamage = 30;
 
-        // 特殊攻撃のオーバーライド
         public override void AttackSpecial()
         {
-            if (isDead || isSwinging) return;
-            Debug.Log("大剣・特殊攻撃（溜め斬り）発動！！");
+            if (isDead || isSwinging || isBlocking || isGuardBroken) return;
+            if (currentMana < 30f)
+            {
+                Debug.Log("Not enough Mana for Special Attack!");
+                return;
+            }
+            currentMana -= 30f;
+            Debug.Log("Taiken Special Attack triggered.");
             StartCoroutine(ChargedSwingRoutine());
         }
 
-        // 溜め斬りの3フェーズコルーチン
         private IEnumerator ChargedSwingRoutine()
         {
             isSwinging = true;
+            isSpecialSwinging = true;
 
-            // ---------------------------------------------------
-            // フェーズ1: 溜め（チャージ）
-            // ゆっくり剣を後方に引いてパワーをため込む
-            // ---------------------------------------------------
-            Debug.Log("溜め斬り: [フェーズ1] 溜め開始...");
+            Hitbox hitbox = GetComponentInChildren<Hitbox>(true);
+            BoxCollider2D col = hitbox != null ? hitbox.GetComponent<BoxCollider2D>() : null;
+            SpriteRenderer weaponSr = visualsTransform != null ? visualsTransform.GetComponent<SpriteRenderer>() : null;
+
+            int originalDamage = hitbox != null ? hitbox.damage : 15;
+            Vector3 origPos = hitbox != null ? hitbox.transform.localPosition : Vector3.zero;
+            Vector2 origSize = col != null ? col.size : Vector2.zero;
+
+            // Instantly enlarge the weapon visual using Sliced SpriteRenderer.size
+            if (visualsTransform != null)
+            {
+                visualsTransform.localPosition = specialWeaponPos;
+                visualsTransform.localScale = Vector3.one; // Keep scale at 1.0 for sliced mode
+
+                if (weaponSr != null)
+                {
+                    weaponSr.drawMode = SpriteDrawMode.Sliced;
+                    weaponSr.size = specialWeaponSize; // Set exact unit size
+                }
+            }
+
+            // Phase 1: Charging
+            Debug.Log("Charged Swing: Phase 1 (Charge) started.");
             float elapsed = 0f;
 
             while (elapsed < chargeWindupDuration)
             {
                 elapsed += Time.deltaTime;
-                // 最初はゆっくり、後半につれて少し速くなる（EaseIn）
                 float t = Mathf.Pow(elapsed / chargeWindupDuration, 0.6f);
                 float angle = Mathf.Lerp(0f, chargeWindupAngle, t);
                 if (visualsTransform != null)
@@ -198,34 +277,31 @@ namespace FightingGameBase
                 yield return null;
             }
 
-            // 引き切った位置で一瞬止める（ため切り感）
             if (visualsTransform != null)
                 visualsTransform.localRotation = Quaternion.Euler(0, 0, chargeWindupAngle);
             yield return new WaitForSeconds(0.05f);
 
-            // ---------------------------------------------------
-            // フェーズ2: 解放（リリース）
-            // 超高速で一気に前方へ振り抜く！当たり判定もここで発生！
-            // ---------------------------------------------------
-            Debug.Log("溜め斬り: [フェーズ2] 解放！！");
+            // Phase 2: Release
+            Debug.Log("Charged Swing: Phase 2 (Release) started.");
 
-            // 溜め斬り専用の超広範囲ヒットボックスを取得して発動
-            Hitbox hitbox = GetComponentInChildren<Hitbox>(true);
             if (hitbox != null)
             {
-                // ダメージを一時的に溜め斬り用の高ダメージに変更して発動
-                int originalDamage = hitbox.damage;
                 hitbox.damage = chargeSlashDamage;
+
+                if (col != null)
+                {
+                    hitbox.transform.localPosition = new Vector3(1.6f, 0.6f, 0f);
+                    col.size = new Vector2(2.5f, 1.0f);
+                }
+
                 StartCoroutine(ActivateHitboxTemporarily(hitbox.gameObject, chargeReleaseDuration + 0.08f));
-                // ダメージを元に戻すコルーチンを続けて実行
-                StartCoroutine(RestoreDamage(hitbox, originalDamage, chargeReleaseDuration + 0.1f));
+                StartCoroutine(RestoreDamageAndSize(hitbox, col, weaponSr, originalDamage, origPos, origSize, chargeReleaseDuration + 0.1f));
             }
 
             elapsed = 0f;
             while (elapsed < chargeReleaseDuration)
             {
                 elapsed += Time.deltaTime;
-                // 急激に加速して叩き込む（EaseIn - t^4）
                 float t = Mathf.Pow(elapsed / chargeReleaseDuration, 4f);
                 float angle = Mathf.Lerp(chargeWindupAngle, chargeReleaseAngle, t);
                 if (visualsTransform != null)
@@ -233,18 +309,14 @@ namespace FightingGameBase
                 yield return null;
             }
 
-            // 振り抜き位置で少し止める（爽快感）
             if (visualsTransform != null)
                 visualsTransform.localRotation = Quaternion.Euler(0, 0, chargeReleaseAngle);
             yield return new WaitForSeconds(0.08f);
 
-            // ---------------------------------------------------
-            // フェーズ3: 戻し（リカバリー）
-            // 滑らかに元の位置に戻る
-            // ---------------------------------------------------
-            Debug.Log("溜め斬り: [フェーズ3] リカバリー中...");
+            // Phase 3: Recovery
+            Debug.Log("Charged Swing: Phase 3 (Recovery) started.");
             elapsed = 0f;
-            float recoverTime = recoverDuration * 1.3f; // 通常より少しゆっくり戻す
+            float recoverTime = recoverDuration * 1.3f;
             while (elapsed < recoverTime)
             {
                 elapsed += Time.deltaTime;
@@ -258,134 +330,322 @@ namespace FightingGameBase
             if (visualsTransform != null)
                 visualsTransform.localRotation = Quaternion.identity;
 
-            Debug.Log("溜め斬り: 完了！");
+            Debug.Log("Charged Swing completed.");
+            isSpecialSwinging = false;
             isSwinging = false;
         }
 
-        // ダメージ値を元に戻すコルーチン
-        private IEnumerator RestoreDamage(Hitbox hitbox, int originalDamage, float delay)
+        private IEnumerator RestoreDamageAndSize(Hitbox hitbox, BoxCollider2D col, SpriteRenderer weaponSr, int originalDamage, Vector3 originalPos, Vector2 originalSize, float delay)
         {
             yield return new WaitForSeconds(delay);
             if (hitbox != null)
+            {
                 hitbox.damage = originalDamage;
+                hitbox.transform.localPosition = originalPos;
+            }
+            if (col != null)
+            {
+                col.size = originalSize;
+            }
+            if (visualsTransform != null)
+            {
+                visualsTransform.localPosition = normalWeaponPos;
+                visualsTransform.localScale = Vector3.one;
+
+                if (weaponSr != null)
+                {
+                    weaponSr.drawMode = SpriteDrawMode.Sliced;
+                    weaponSr.size = normalWeaponSize;
+                }
+            }
         }
 
-        // =========================================================
-        // ブロック・パリーシステム
-        // Hキー押下でガード姿勢。押した瞬間0.25秒はパリー受付窓。
-        // パリー成功: ダメージ0 + バウンスアニメ
-        // 通常ブロック: ダメージ0（ガード中）
-        // =========================================================
-
-        [Header("ブロック・パリー設定")]
-        [Tooltip("ブロック時の剣の角度（横構えの角度）")]
-        public float blockAngle = 85f;
-
-        [Tooltip("ブロック姿勢に移行する時間（秒）")]
-        public float blockEnterDuration = 0.08f;
-
-        [Tooltip("パリー受付窓の長さ（秒）- この間に攻撃を受けるとパリー成功！")]
+        [Header("Block & Parry Settings")]
+        [Tooltip("Duration of the parry window.")]
         public float parryWindow = 0.25f;
 
         private bool isBlocking = false;
-        private bool isParrying = false;   // パリー受付窓が開いているか
+        private bool isParrying = false;
         private Coroutine blockCoroutine;
 
-        // ブロック開始（Hキーを押した瞬間）
         public override void StartBlock()
         {
-            if (isDead || isSwinging) return;
+            if (isDead || isSwinging || isGuardBroken) return;
 
             isBlocking = true;
-            isParrying = true;
-            Debug.Log("ブロック開始！パリー受付窓オープン！");
+            isBlockingState = true;
 
-            // 既存のブロックコルーチンがあれば止める
-            if (blockCoroutine != null) StopCoroutine(blockCoroutine);
-            blockCoroutine = StartCoroutine(BlockEnterRoutine());
+            // DeepWoken Block Spam Prevention: Check parry cooldown
+            if (Time.time - lastParryTime < parryCooldown)
+            {
+                isParrying = false;
+                Debug.Log("Block start (Parry on Cooldown - Block Only).");
+            }
+            else
+            {
+                isParrying = true;
+                lastParryTime = Time.time;
+                Debug.Log("Block start (Parry Window Active).");
+                StartCoroutine(CloseParryWindow());
+            }
 
-            // パリー窓を時間で閉じる
-            StartCoroutine(CloseParryWindow());
+            if (blockShield != null)
+            {
+                // Force-override shield visual parameters to ensure it is 100% visible on block.
+                SpriteRenderer shieldSr = blockShield.GetComponent<SpriteRenderer>();
+                if (shieldSr == null)
+                {
+                    shieldSr = blockShield.AddComponent<SpriteRenderer>();
+                }
+
+                if (shieldSr.sprite == null)
+                {
+                    SpriteRenderer charSr = GetComponentInChildren<SpriteRenderer>();
+                    if (charSr != null)
+                    {
+                        shieldSr.sprite = charSr.sprite;
+                    }
+                }
+                
+                shieldSr.drawMode = SpriteDrawMode.Sliced;
+                shieldSr.size = new Vector2(0.8f, 2.0f); // Cover the front of the character (1x2 size)
+                // Vivid blue if parrying, dull blue if block-only
+                shieldSr.color = isParrying ? new Color(0.3f, 0.8f, 1f, 0.6f) : new Color(0.3f, 0.5f, 0.7f, 0.45f);
+                shieldSr.sortingOrder = 10; // Bring to absolute front
+
+                // Position shield right in front of the character's face/body.
+                blockShield.transform.localPosition = new Vector3(0.7f, 0f, 0f);
+                blockShield.transform.localScale = Vector3.one;
+
+                blockShield.SetActive(true);
+            }
         }
 
-        // ブロック解除（Hキーを離した瞬間）
         public override void StopBlock()
         {
             if (!isBlocking) return;
 
             isBlocking = false;
+            isBlockingState = false;
             isParrying = false;
-            Debug.Log("ブロック解除。");
+            Debug.Log("Block stop.");
 
-            if (blockCoroutine != null) StopCoroutine(blockCoroutine);
-            blockCoroutine = StartCoroutine(BlockExitRoutine());
+            if (blockShield != null)
+            {
+                blockShield.SetActive(false);
+            }
         }
 
-        // ダメージ処理をオーバーライド: ブロック中はノーダメ
         public override void TakeDamage(int damage)
         {
             if (isDead) return;
 
-            if (isBlocking)
+            if (isSpecialSwinging)
+            {
+                isSpecialSwinging = false;
+                isSwinging = false;
+                if (visualsTransform != null)
+                {
+                    visualsTransform.localPosition = normalWeaponPos;
+                    visualsTransform.localScale = Vector3.one; // Revert scale
+
+                    SpriteRenderer weaponSr = visualsTransform.GetComponent<SpriteRenderer>();
+                    if (weaponSr != null)
+                    {
+                        weaponSr.drawMode = SpriteDrawMode.Sliced;
+                        weaponSr.size = normalWeaponSize; // Revert size
+                    }
+                }
+            }
+
+            if (isSwinging)
+            {
+                isSwinging = false;
+            }
+
+            // Locate the opponent (attacker)
+            CharacterBase opponent = null;
+            CharacterBase[] allChars = FindObjectsByType<CharacterBase>(FindObjectsSortMode.None);
+            foreach (CharacterBase c in allChars)
+            {
+                if (c != this && !c.isDead)
+                {
+                    opponent = c;
+                    break;
+                }
+            }
+
+            bool isBackAttack = false;
+            if (opponent != null)
+            {
+                float faceDir = transform.localScale.x; // 1 = right, -1 = left
+                float relativeX = opponent.transform.position.x - transform.position.x;
+                
+                // If facing right but opponent is on left, or facing left but opponent is on right -> Back attack!
+                if ((faceDir > 0 && relativeX < 0) || (faceDir < 0 && relativeX > 0))
+                {
+                    isBackAttack = true;
+                }
+            }
+
+            if (isBlocking && !isBackAttack)
             {
                 if (isParrying)
                 {
-                    // ★ パリー成功！ダメージ0 + バウンスアニメ
-                    Debug.Log("★パリー成功！ノーダメージ！");
+                    // --- DeepWoken Parry Success ---
+                    Debug.Log("★ PARRY SUCCESS! (DeepWoken Style) ★");
+                    
+                    // Reset parry cooldown immediately to reward player for successful parry!
+                    lastParryTime = -10f;
+
+                    // Recover posture as a reward
+                    currentPosture -= 15f;
+                    if (currentPosture < 0f) currentPosture = 0f;
+
+                    if (opponent != null)
+                    {
+                        // Stun attacker for 0.6 seconds
+                        opponent.Stun(0.6f);
+
+                        // Apply knockback to attacker (bypassing protected member constraints)
+                        Rigidbody2D oppRb = opponent.GetComponent<Rigidbody2D>();
+                        if (oppRb != null)
+                        {
+                            float pushDir = (opponent.transform.position.x > transform.position.x) ? 1.0f : -1.0f;
+                            oppRb.linearVelocity = new Vector2(pushDir * 8f, oppRb.linearVelocity.y);
+                        }
+                    }
+
                     StartCoroutine(ParrySuccessRoutine());
                 }
                 else
                 {
-                    // 通常ブロック: ダメージ0
-                    Debug.Log("ブロック成功！ダメージを防いだ！");
-                    StartCoroutine(BlockHitRoutine());
+                    // --- DeepWoken Block Success ---
+                    Debug.Log("Block success. Posture accumulating.");
+                    
+                    // Accumulate posture based on damage
+                    currentPosture += damage * 1.5f;
+
+                    if (currentPosture >= maxPosture)
+                    {
+                        // GUARD BREAK!
+                        StartCoroutine(GuardBreakRoutine());
+                    }
+                    else
+                    {
+                        StartCoroutine(BlockHitRoutine());
+                    }
                 }
-                return; // ダメージを通さない
+                return; // Negate damage
             }
 
-            // ブロックしていなければ通常のダメージ処理
+            if (blockShield != null)
+            {
+                blockShield.SetActive(false);
+            }
+            isBlockingState = false;
+
+            if (isBlocking && isBackAttack)
+            {
+                Debug.Log("Blocked from behind! Guard bypassed!");
+            }
+
             base.TakeDamage(damage);
+
+            if (isDead && blockShield != null)
+            {
+                blockShield.SetActive(false);
+            }
         }
 
-        // --- ブロック・パリーのアニメーションコルーチン ---
+        private IEnumerator GuardBreakRoutine()
+        {
+            isGuardBroken = true;
+            isBlocking = false;
+            isBlockingState = false;
+            isParrying = false;
 
-        // ブロック姿勢に素早く移行する
+            Debug.Log("!! GUARD BREAK !!");
+
+            // Visually turn shield red and flash, then crush it
+            if (blockShield != null)
+            {
+                SpriteRenderer shieldSr = blockShield.GetComponent<SpriteRenderer>();
+                if (shieldSr != null)
+                {
+                    shieldSr.color = new Color(1f, 0.2f, 0.2f, 0.8f);
+                }
+                blockShield.SetActive(true);
+                yield return new WaitForSeconds(0.2f);
+                blockShield.SetActive(false);
+            }
+
+            // Stun character and visual color cue (orange-red)
+            SpriteRenderer bodySr = GetComponentInChildren<SpriteRenderer>();
+            Color originalColor = bodySr != null ? bodySr.color : Color.white;
+            if (bodySr != null)
+            {
+                bodySr.color = new Color(0.9f, 0.3f, 0.1f, 1f);
+            }
+
+            yield return new WaitForSeconds(guardBreakDuration);
+
+            // Recover
+            if (bodySr != null)
+            {
+                bodySr.color = originalColor;
+            }
+            currentPosture = 0f;
+            isGuardBroken = false;
+            Debug.Log("Guard Break Stun finished.");
+        }
+
         private IEnumerator BlockEnterRoutine()
         {
-            float elapsed = 0f;
-            float startAngle = visualsTransform != null
-                ? visualsTransform.localRotation.eulerAngles.z
-                : 0f;
-            // eulerAngles は 0-360 で返ってくるので -180 変換
-            if (startAngle > 180f) startAngle -= 360f;
-
-            while (elapsed < blockEnterDuration)
-            {
-                elapsed += Time.deltaTime;
-                float t = elapsed / blockEnterDuration;
-                // 素早く移行（EaseOut）
-                t = 1f - Mathf.Pow(1f - t, 3f);
-                float angle = Mathf.Lerp(startAngle, blockAngle, t);
-                if (visualsTransform != null)
-                    visualsTransform.localRotation = Quaternion.Euler(0, 0, angle);
-                yield return null;
-            }
-
-            if (visualsTransform != null)
-                visualsTransform.localRotation = Quaternion.Euler(0, 0, blockAngle);
+            yield break;
         }
 
-        // ブロック姿勢から元の位置に戻る
         private IEnumerator BlockExitRoutine()
         {
-            float elapsed = 0f;
-            float exitDuration = 0.15f;
+            yield break;
+        }
 
-            while (elapsed < exitDuration)
+        private IEnumerator CloseParryWindow()
+        {
+            yield return new WaitForSeconds(parryWindow);
+            if (isBlocking)
+            {
+                isParrying = false;
+                Debug.Log("Parry window closed.");
+            }
+        }
+
+        private IEnumerator ParrySuccessRoutine()
+        {
+            // Flash shield white for parry feedback
+            if (blockShield != null)
+            {
+                SpriteRenderer shieldSr = blockShield.GetComponent<SpriteRenderer>();
+                if (shieldSr != null)
+                {
+                    shieldSr.color = new Color(1f, 1f, 1f, 0.9f); // Pure white flash
+                }
+                
+                yield return new WaitForSeconds(0.1f);
+
+                if (shieldSr != null)
+                {
+                    shieldSr.color = new Color(0.3f, 0.8f, 1f, 0.6f);
+                }
+            }
+
+            float elapsed = 0f;
+            float bounceDuration = 0.06f;
+            while (elapsed < bounceDuration)
             {
                 elapsed += Time.deltaTime;
-                float t = Mathf.Sin((elapsed / exitDuration) * Mathf.PI * 0.5f);
-                float angle = Mathf.Lerp(blockAngle, 0f, t);
+                float t = elapsed / bounceDuration;
+                float angle = blockShield != null ? 15f * Mathf.Sin(t * Mathf.PI) : 0f;
                 if (visualsTransform != null)
                     visualsTransform.localRotation = Quaternion.Euler(0, 0, angle);
                 yield return null;
@@ -395,64 +655,6 @@ namespace FightingGameBase
                 visualsTransform.localRotation = Quaternion.identity;
         }
 
-        // パリー受付窓を一定時間後に閉じる
-        private IEnumerator CloseParryWindow()
-        {
-            yield return new WaitForSeconds(parryWindow);
-            if (isBlocking)
-            {
-                isParrying = false;
-                Debug.Log("パリー窓クローズ（通常ブロック状態へ）");
-            }
-        }
-
-        // パリー成功時のバウンスアニメーション
-        private IEnumerator ParrySuccessRoutine()
-        {
-            // ① 一瞬ぐっと後ろに弾かれる（衝撃）
-            float elapsed = 0f;
-            float bounceDuration = 0.06f;
-            while (elapsed < bounceDuration)
-            {
-                elapsed += Time.deltaTime;
-                float t = elapsed / bounceDuration;
-                float angle = Mathf.Lerp(blockAngle, blockAngle - 40f, t);
-                if (visualsTransform != null)
-                    visualsTransform.localRotation = Quaternion.Euler(0, 0, angle);
-                yield return null;
-            }
-
-            // ② キラッと逆方向に切り返す（パリー反撃の気配）
-            elapsed = 0f;
-            float flashDuration = 0.1f;
-            while (elapsed < flashDuration)
-            {
-                elapsed += Time.deltaTime;
-                float t = elapsed / flashDuration;
-                float angle = Mathf.Lerp(blockAngle - 40f, blockAngle + 25f, t * t);
-                if (visualsTransform != null)
-                    visualsTransform.localRotation = Quaternion.Euler(0, 0, angle);
-                yield return null;
-            }
-
-            // ③ ゆっくりガード姿勢に戻る（まだブロック中）
-            elapsed = 0f;
-            float returnDuration = 0.12f;
-            while (elapsed < returnDuration)
-            {
-                elapsed += Time.deltaTime;
-                float t = Mathf.Sin((elapsed / returnDuration) * Mathf.PI * 0.5f);
-                float angle = Mathf.Lerp(blockAngle + 25f, blockAngle, t);
-                if (visualsTransform != null)
-                    visualsTransform.localRotation = Quaternion.Euler(0, 0, angle);
-                yield return null;
-            }
-
-            if (visualsTransform != null)
-                visualsTransform.localRotation = Quaternion.Euler(0, 0, blockAngle);
-        }
-
-        // 通常ブロック被弾時の小さな揺れアニメーション
         private IEnumerator BlockHitRoutine()
         {
             float elapsed = 0f;
@@ -461,15 +663,14 @@ namespace FightingGameBase
             {
                 elapsed += Time.deltaTime;
                 float t = elapsed / shakeDuration;
-                // 小さく揺れる
-                float angle = blockAngle - Mathf.Sin(t * Mathf.PI) * 15f;
+                float angle = -15f * Mathf.Sin(t * Mathf.PI);
                 if (visualsTransform != null)
                     visualsTransform.localRotation = Quaternion.Euler(0, 0, angle);
                 yield return null;
             }
 
             if (visualsTransform != null)
-                visualsTransform.localRotation = Quaternion.Euler(0, 0, blockAngle);
+                visualsTransform.localRotation = Quaternion.identity;
         }
     }
 }

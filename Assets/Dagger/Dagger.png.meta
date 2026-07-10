@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: ad8b08b373226a746a73e74b5ca7aa66
+guid: 6e2a6eeaf119fc2428d83e72d2f4cfdd
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 8278756235668076275
-    second: FloatingGreatsword_0
+      213: -2486521743634864436
+    second: Dagger_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -113,7 +113,7 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: FloatingGreatsword_0
+      name: Dagger_0
       rect:
         serializedVersion: 2
         x: 0
@@ -128,8 +128,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 3f6bb010fec04e270800000000000000
-      internalID: 8278756235668076275
+      spriteID: cc6eb58f5a91e7dd0800000000000000
+      internalID: -2486521743634864436
       vertices: []
       indices: 
       edges: []
@@ -148,7 +148,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      FloatingGreatsword_0: 8278756235668076275
+      Dagger_0: -2486521743634864436
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
