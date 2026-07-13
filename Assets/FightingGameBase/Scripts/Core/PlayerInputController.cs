@@ -20,6 +20,7 @@ namespace FightingGameBase
         public Key jumpKey = Key.Space;          // ジャンプ
         public Key normalAttackKey = Key.Z;      // 通常攻撃
         public Key specialAttackKey = Key.X;     // 特殊攻撃
+        public Key stunAttackKey = Key.C;        // スタンスキル（行動不能）
 
         [Header("設定")]
         [Tooltip("ZとXの同時押しと判定する猶予時間（秒）。0.05秒くらいがちょうどいいです")]
@@ -40,8 +41,8 @@ namespace FightingGameBase
 
         void Update()
         {
-            // キャラクターがいない、または倒れている場合は入力を受け付けません
-            if (character == null || character.isDead) return;
+            // キャラクターがいない、または倒れている、またはスタン中の場合は入力を受け付けません
+            if (character == null || character.isDead || character.isStunned) return;
             
             // キーボードが接続されていない場合も何もしません
             if (Keyboard.current == null) return;
@@ -133,6 +134,12 @@ namespace FightingGameBase
             if (Keyboard.current[normalAttackKey].wasReleasedThisFrame || Keyboard.current[specialAttackKey].wasReleasedThisFrame)
             {
                 isUltimateTriggered = false;
+            }
+
+            // --- スタンスキル (C) ---
+            if (Keyboard.current[stunAttackKey].wasPressedThisFrame)
+            {
+                character.AttackStun();
             }
         }
     }
