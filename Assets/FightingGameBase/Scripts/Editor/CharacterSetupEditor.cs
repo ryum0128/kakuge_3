@@ -89,6 +89,34 @@ namespace FightingGameBase.Editor
             
             Debug.Log($"【完了】お手本キャラクターを全部込々にしてプレハブとして作成しました！\n場所: {prefabPath} に保存されています。");
         }
+
+        [MenuItem("FightingGame/地面を追加する")]
+        public static void CreateGround()
+        {
+            // シーン内に「Ground」という名前のゲームオブジェクトを作成します
+            GameObject ground = new GameObject("Ground");
+            
+            // 位置を設定（プレイヤーの下になるように配置）
+            ground.transform.position = new Vector3(0f, -2f, 0f);
+
+            // 物理的な床として機能させるため、BoxCollider2Dをアタッチ
+            BoxCollider2D collider = ground.AddComponent<BoxCollider2D>();
+            collider.size = new Vector2(20f, 2f);
+
+            // 見た目を表示するためにSpriteRendererをアタッチ
+            SpriteRenderer sr = ground.AddComponent<SpriteRenderer>();
+            sr.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+            sr.drawMode = SpriteDrawMode.Sliced;
+            sr.size = new Vector2(20f, 2f);
+            
+            // 地面らしいスタイリッシュな色（落ち着いたダークスレートグレー）を設定
+            sr.color = new Color(0.2f, 0.25f, 0.3f, 1f);
+
+            // 作成したオブジェクトを選択状態にする
+            Selection.activeGameObject = ground;
+
+            Debug.Log("【完了】地面（ステージ床）「Ground」を作成しました！位置は (0, -2, 0) です。キャラクターが落下して立つことができます。");
+        }
     }
 }
 #endif

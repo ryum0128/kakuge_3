@@ -95,6 +95,14 @@ namespace FightingGameBase
         private Rigidbody2D myRb;
         private Animator myAnimator;
         private bool isHovering = true; // 浮遊しているかどうか
+        private bool isAttacking = false; // 攻撃中かどうか
+
+        private System.Collections.IEnumerator SetAttackingState(float duration)
+        {
+            isAttacking = true;
+            yield return new WaitForSeconds(duration);
+            isAttacking = false;
+        }
 
         // 移動とジャンプの上書き（チャージ中は動けないようにする）
         public new void Move(float direction)
@@ -293,10 +301,13 @@ namespace FightingGameBase
         // =========================================================
         public new void AttackNormal()
         {
-            if (isDead) return;
+            if (isDead || isAttacking) return;
 
             if (myAnimator != null) myAnimator.SetTrigger("AttackNormal");
             Debug.Log("ガンランス：突き攻撃！");
+
+            // 攻撃状態をセット (突き攻撃の硬直時間は 0.25 秒)
+            StartCoroutine(SetAttackingState(0.25f));
 
             // 子オブジェクトからHitbox（攻撃判定）を探して、一時的にオンにします
             Hitbox hitbox = GetComponentInChildren<Hitbox>(true);
@@ -311,10 +322,13 @@ namespace FightingGameBase
         // =========================================================
         public new void AttackSpecial()
         {
-            if (isDead) return;
+            if (isDead || isAttacking) return;
 
             if (myAnimator != null) myAnimator.SetTrigger("AttackSpecial");
             Debug.Log("ガンランス：砲撃発射！！");
+
+            // 攻撃状態をセット (砲撃硬直時間は 0.35 秒)
+            StartCoroutine(SetAttackingState(0.35f));
 
             // 砲撃弾のプレハブが設定されていれば、弾を生成して飛ばします
             if (shellPrefab != null && firePoint != null)
@@ -342,7 +356,7 @@ namespace FightingGameBase
         // =========================================================
         public new void AttackUltimate()
         {
-            if (isDead) return;
+            if (isDead || isAttacking) return;
 
             // 必殺技発動時にゲージを消費してゼロに戻す
             chargeGauge = 0f;
@@ -350,158 +364,43 @@ namespace FightingGameBase
             if (myAnimator != null) myAnimator.SetTrigger("AttackUltimate");
             Debug.Log("ガンランス：竜撃砲発動！！！");
 
-            // --- 竜撃砲専用の広い攻撃判定を出す ---
-            if (dragonBlastHitbox != null)
-            {
-                // 専用のHitboxコンポーネントを取得して設定を適用
-                Hitbox hitbox = dragonBlastHitbox.GetComponent<Hitbox>();
-                if (hitbox != null)
-                {
-                    hitbox.damage = dragonBlastDamage;
-                    hitbox.ownerPlayerID = playerID;
-                }
-                
-                // 0.4秒間だけ判定を出します
-                StartCoroutine(ActivateHitboxTemporarily(dragonBlastHitbox, 0.4f));
-            }
-            else
-            {
-                // 専用Hitboxが未設定の場合は、突き判定を流用（フォールバック）
-                Hitbox hitbox = GetComponentInChildren<Hitbox>(true);
-                if (hitbox != null)
-                {
-                    int originalDamage = hitbox.damage;
-                    hitbox.damage = dragonBlastDamage;
-                    StartCoroutine(ActivateHitboxTemporarily(hitbox.gameObject, 0.4f));
-                    StartCoroutine(ResetDamageAfterDelay(hitbox, originalDamage, 0.45f));
-                }
-            }
+            // 攻撃状態をセット (竜撃砲の反動と硬直時間は 0.6 秒)
+            StartCoroutine(SetAttackingState(0.6f));
+
+            // --- 竜撃砲の弾（とび道具）を生成して飛ばす ---
+            GameObject projObj = new GameObject("DragonBlastProjectile");
+            
+            // 発射位置の決定（firePointがあればそこ、無ければ自分の位置）
+            Vector3 spawnPos = firePoint != null ? firePoint.position : transform.position;
+            projObj.transform.position = spawnPos;
+
+            // コンポーネントのアタッチと初期化
+            DragonBlastProjectile proj = projObj.AddComponent<DragonBlastProjectile>();
+            
+            float direction = Mathf.Sign(transform.localScale.x);
+            // 弾速は少し速めの 15f で飛んでいくようにします
+            proj.Initialize(direction, 15f, dragonBlastDamage, playerID);
 
             // --- 反動で後ろに吹っ飛びます ---
             float recoilDirection = -Mathf.Sign(transform.localScale.x);
             myRb.AddForce(new Vector2(recoilDirection * dragonBlastRecoil, 2f), ForceMode2D.Impulse);
-
-            // --- 赤いレーザーエフェクトを発射！ ---
-            FireLaserEffect();
         }
 
         // =========================================================
-        // 竜撃砲の赤いレーザーエフェクト（LineRenderer を使用）
+        // ダメージを受けた時の処理（攻撃キャンセルの追加）
         // =========================================================
-        private void FireLaserEffect()
+        public new void TakeDamage(int damage)
         {
-            StartCoroutine(LaserCoroutine());
+            if (isDead) return;
+
+            // 被ダメージ時は攻撃を中断し、攻撃状態をリセットする
+            isAttacking = false;
+            StopAllCoroutines();
+
+            base.TakeDamage(damage);
         }
 
-        private System.Collections.IEnumerator LaserCoroutine()
-        {
-            // レーザーを担うGameObjectを動的に作成
-            GameObject laserObj = new GameObject("DragonBlastLaser");
-            LineRenderer lr = laserObj.AddComponent<LineRenderer>();
 
-            // 発射方向（キャラクターの向き）
-            float dir = Mathf.Sign(transform.localScale.x);
-
-            // =============================================
-            // 当たり判定（DragonBlastHitbox）からサイズを計算
-            // =============================================
-            float hitboxSizeX = laserRange;  // フォールバック用
-            float hitboxSizeY = laserWidth;  // フォールバック用
-            float hitboxStartX = 0f;         // キャラクターからの開始オフセット（ローカル）
-
-            if (dragonBlastHitbox != null)
-            {
-                BoxCollider2D col = dragonBlastHitbox.GetComponent<BoxCollider2D>();
-                if (col != null)
-                {
-                    // Boundsはワールド空間（スケール込み）
-                    Bounds b = col.bounds;
-                    hitboxSizeY = b.size.y;  // レーザーの太さ = ヒットボックスの高さ
-                    hitboxSizeX = b.size.x;  // レーザーの長さ = ヒットボックスの幅
-
-                    // 開始・終了位置をヒットボックスの左端・右端に合わせる
-                    // dir > 0（右向き）なら左端がstart、右端がend
-                    hitboxStartX = (dir > 0) ? b.min.x : b.max.x;
-                }
-            }
-
-            // LineRenderer の初期設定
-            lr.positionCount = 2;
-            lr.useWorldSpace = true;
-            lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            lr.receiveShadows = false;
-
-            // マテリアル（組み込みのSprites/Defaultで色が乗る）
-            lr.material = new Material(Shader.Find("Sprites/Default"));
-
-            // アニメーションループ
-            float elapsed = 0f;
-            while (elapsed < laserDuration)
-            {
-                elapsed += Time.deltaTime;
-                float t = elapsed / laserDuration; // 0→1
-
-                // ちらつき（フリッカー）
-                float flicker = 1f - Mathf.PerlinNoise(elapsed * 30f, 0f) * 0.3f;
-
-                // 色：赤→オレンジに推移して、時間とともに透明にフェード
-                float alpha = (1f - t) * flicker;
-                lr.startColor = new Color(1f, Mathf.Lerp(0f,  0.3f, t), 0f, alpha);
-                lr.endColor   = new Color(1f, Mathf.Lerp(0.2f, 0.6f, t), 0f, alpha * 0.4f);
-
-                // 太さも時間とともに細くなる（ヒットボックスの高さに合わせてスタート）
-                float currentWidth = hitboxSizeY * (1f - t * 0.5f) * flicker;
-                lr.startWidth = currentWidth;
-                lr.endWidth   = currentWidth; // 均一にしてヒットボックスの高さと合わせる
-
-                // =========================================
-                // 位置：ヒットボックスのboundsを毎フレーム再取得（キャラが動いても追従）
-                // =========================================
-                Vector3 startPos, endPos;
-                if (dragonBlastHitbox != null)
-                {
-                    BoxCollider2D col = dragonBlastHitbox.GetComponent<BoxCollider2D>();
-                    if (col != null)
-                    {
-                        Bounds b = col.bounds;
-                        // dir > 0 なら右向き：左端→右端、左向き：右端→左端
-                        startPos = new Vector3((dir > 0) ? b.min.x : b.max.x, b.center.y, 0f);
-                        endPos   = new Vector3((dir > 0) ? b.max.x : b.min.x, b.center.y, 0f);
-                    }
-                    else
-                    {
-                        // fallback
-                        Vector3 fp = firePoint != null ? firePoint.position : transform.position;
-                        startPos = fp;
-                        endPos   = fp + new Vector3(dir * hitboxSizeX, 0f, 0f);
-                    }
-                }
-                else
-                {
-                    Vector3 fp = firePoint != null ? firePoint.position : transform.position;
-                    startPos = fp;
-                    endPos   = fp + new Vector3(dir * hitboxSizeX, 0f, 0f);
-                }
-
-                lr.SetPosition(0, startPos);
-                lr.SetPosition(1, endPos);
-
-                yield return null;
-            }
-
-            // レーザー消去
-            Destroy(laserObj);
-        }
-
-        // 一定時間後にダメージを元に戻すコルーチン
-        private System.Collections.IEnumerator ResetDamageAfterDelay(Hitbox hitbox, int originalDamage, float delay)
-        {
-            yield return new WaitForSeconds(delay);
-            if (hitbox != null)
-            {
-                hitbox.damage = originalDamage;
-            }
-        }
 
         // ActivateHitboxTemporarily はお手本（CharacterBase）と同じ仕組みです
         private System.Collections.IEnumerator ActivateHitboxTemporarily(GameObject hitboxObj, float duration)
