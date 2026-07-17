@@ -31,6 +31,11 @@ namespace FightingGameBase
         private bool isSpecialSwinging = false;
         private GameObject blockShield;
 
+        private Coroutine normalAttackCoroutine;
+        private Coroutine specialAttackCoroutine;
+
+        public override bool IsAttacking => isSwinging || isSpecialSwinging;
+
         // DeepWoken Parry Cooldown variables
         private float lastParryTime = -10f;
         private float parryCooldown = 0.35f;
@@ -143,7 +148,7 @@ namespace FightingGameBase
         // Override AttackNormal for Taiken custom swing.
         public override void AttackNormal()
         {
-            if (isDead || isSwinging || isBlocking || isGuardBroken) return;
+            if (isDead || isSwinging || isBlocking || isGuardBroken || isDashingOrEvading || IsHurtLocked) return;
 
             Debug.Log("Taiken Normal Attack triggered.");
             
@@ -153,28 +158,46 @@ namespace FightingGameBase
             }
 
             Hitbox hitbox = GetComponentInChildren<Hitbox>(true);
+            normalAttackCoroutine = StartCoroutine(SwingRoutine(hitbox));
+        }
+
+        private IEnumerator SwingRoutine(Hitbox hitbox)
+        {
+            isSwinging = true;
+            Debug.Log("Taiken animation: windup start.");
+            float elapsed = 0f;
+
+            // 1. 予備動作（ウィンドアップ）: 武器を振りかぶる (0.20秒)
+            float windupDuration = 0.20f;
+            while (elapsed < windupDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / windupDuration;
+                t = Mathf.Sin(t * Mathf.PI * 0.5f); // イージング
+
+                float angle = Mathf.Lerp(0f, swingStartAngle + 20f, t);
+                if (visualsTransform != null)
+                {
+                    visualsTransform.localRotation = Quaternion.Euler(0, 0, angle);
+                }
+                yield return null;
+            }
+
+            // 2. 攻撃判定の有効化 (予備動作の直後に発生！)
             if (hitbox != null)
             {
                 StartCoroutine(ActivateHitboxTemporarily(hitbox.gameObject, 0.22f));
             }
 
-            StartCoroutine(SwingRoutine());
-        }
-
-        private IEnumerator SwingRoutine()
-        {
-            isSwinging = true;
-            Debug.Log("Taiken animation: swing start.");
-            float elapsed = 0f;
-
-            // 1. Swing down phase
+            // 3. 振り下ろしフェーズ (0.18秒)
+            elapsed = 0f;
             while (elapsed < swingDuration)
             {
                 elapsed += Time.deltaTime;
                 float t = elapsed / swingDuration;
                 t = t * t; 
                 
-                float angle = Mathf.Lerp(swingStartAngle, swingEndAngle, t);
+                float angle = Mathf.Lerp(swingStartAngle + 20f, swingEndAngle, t);
                 if (visualsTransform != null)
                 {
                     visualsTransform.localRotation = Quaternion.Euler(0, 0, angle);
@@ -189,7 +212,7 @@ namespace FightingGameBase
             
             yield return new WaitForSeconds(0.04f);
 
-            // 2. Recover phase
+            // 4. 回収（フォロースルー）フェーズ (0.28秒)
             elapsed = 0f;
             while (elapsed < recoverDuration)
             {
@@ -226,7 +249,7 @@ namespace FightingGameBase
 
         public override void AttackSpecial()
         {
-            if (isDead || isSwinging || isBlocking || isGuardBroken) return;
+            if (isDead || isSwinging || isBlocking || isGuardBroken || isDashingOrEvading || IsHurtLocked) return;
             if (currentMana < 30f)
             {
                 Debug.Log("Not enough Mana for Special Attack!");
@@ -234,7 +257,7 @@ namespace FightingGameBase
             }
             currentMana -= 30f;
             Debug.Log("Taiken Special Attack triggered.");
-            StartCoroutine(ChargedSwingRoutine());
+            specialAttackCoroutine = StartCoroutine(ChargedSwingRoutine());
         }
 
         private IEnumerator ChargedSwingRoutine()
@@ -287,6 +310,8 @@ namespace FightingGameBase
             if (hitbox != null)
             {
                 hitbox.damage = chargeSlashDamage;
+                hitbox.postureDamageMultiplier = 4.0f; // 大幅に体幹ダメージを増加 (4.0x)
+                hitbox.isNormalAttack = false; // 特殊攻撃中は通常攻撃としてのマナ回復を無効化
 
                 if (col != null)
                 {
@@ -342,6 +367,8 @@ namespace FightingGameBase
             {
                 hitbox.damage = originalDamage;
                 hitbox.transform.localPosition = originalPos;
+                hitbox.postureDamageMultiplier = 1.5f; // 通常の蓄積倍率に戻す
+                hitbox.isNormalAttack = true; // 通常攻撃判定に戻す
             }
             if (col != null)
             {
@@ -436,32 +463,49 @@ namespace FightingGameBase
             }
         }
 
-        public override void TakeDamage(int damage)
+        private void CancelAttacks()
         {
-            if (isDead) return;
+            isSwinging = false;
+            isSpecialSwinging = false;
 
-            if (isSpecialSwinging)
+            if (normalAttackCoroutine != null)
             {
-                isSpecialSwinging = false;
-                isSwinging = false;
-                if (visualsTransform != null)
-                {
-                    visualsTransform.localPosition = normalWeaponPos;
-                    visualsTransform.localScale = Vector3.one; // Revert scale
+                StopCoroutine(normalAttackCoroutine);
+                normalAttackCoroutine = null;
+            }
+            if (specialAttackCoroutine != null)
+            {
+                StopCoroutine(specialAttackCoroutine);
+                specialAttackCoroutine = null;
+            }
 
-                    SpriteRenderer weaponSr = visualsTransform.GetComponent<SpriteRenderer>();
-                    if (weaponSr != null)
-                    {
-                        weaponSr.drawMode = SpriteDrawMode.Sliced;
-                        weaponSr.size = normalWeaponSize; // Revert size
-                    }
+            Hitbox hitbox = GetComponentInChildren<Hitbox>(true);
+            if (hitbox != null)
+            {
+                hitbox.gameObject.SetActive(false);
+            }
+
+            // Restore weapon visual properties
+            if (visualsTransform != null)
+            {
+                visualsTransform.localPosition = normalWeaponPos;
+                visualsTransform.localRotation = Quaternion.identity;
+                visualsTransform.localScale = Vector3.one;
+
+                SpriteRenderer weaponSr = visualsTransform.GetComponent<SpriteRenderer>();
+                if (weaponSr != null)
+                {
+                    weaponSr.drawMode = SpriteDrawMode.Sliced;
+                    weaponSr.size = normalWeaponSize;
                 }
             }
+        }
 
-            if (isSwinging)
-            {
-                isSwinging = false;
-            }
+        public override void TakeDamage(int damage, Hitbox attackerHitbox = null)
+        {
+            if (isDead || isInvincible) return;
+
+            CancelAttacks();
 
             // Locate the opponent (attacker)
             CharacterBase opponent = null;
@@ -498,9 +542,12 @@ namespace FightingGameBase
                     // Reset parry cooldown immediately to reward player for successful parry!
                     lastParryTime = -10f;
 
-                    // Recover posture as a reward
-                    currentPosture -= 15f;
+                    // Recover posture by the attack's damage as a reward
+                    currentPosture -= damage;
                     if (currentPosture < 0f) currentPosture = 0f;
+
+                    // パリー成功報酬としてマナを少量(6f)回復する
+                    AddMana(6f);
 
                     if (opponent != null)
                     {
@@ -523,8 +570,9 @@ namespace FightingGameBase
                     // --- DeepWoken Block Success ---
                     Debug.Log("Block success. Posture accumulating.");
                     
-                    // Accumulate posture based on damage
-                    currentPosture += damage * 1.5f;
+                    // Accumulate posture based on damage (using custom multiplier if hit by a specific hitbox)
+                    float postureMultiplier = attackerHitbox != null ? attackerHitbox.postureDamageMultiplier : 1.5f;
+                    currentPosture += damage * postureMultiplier;
 
                     if (currentPosture >= maxPosture)
                     {
@@ -550,7 +598,7 @@ namespace FightingGameBase
                 Debug.Log("Blocked from behind! Guard bypassed!");
             }
 
-            base.TakeDamage(damage);
+            base.TakeDamage(damage, attackerHitbox);
 
             if (isDead && blockShield != null)
             {
@@ -560,11 +608,16 @@ namespace FightingGameBase
 
         private IEnumerator GuardBreakRoutine()
         {
+            if (HUDManager.Instance != null)
+            {
+                HUDManager.Instance.TriggerHitStop(2); // Freeze frame for 2 frames
+            }
+
             isGuardBroken = true;
             isBlocking = false;
             isBlockingState = false;
             isParrying = false;
-
+ 
             Debug.Log("!! GUARD BREAK !!");
 
             // Visually turn shield red and flash, then crush it
@@ -622,6 +675,13 @@ namespace FightingGameBase
 
         private IEnumerator ParrySuccessRoutine()
         {
+            SpriteRenderer bodySr = GetComponentInChildren<SpriteRenderer>();
+            Color originalColor = bodySr != null ? bodySr.color : new Color(0.8f, 0.2f, 0.2f, 1f);
+            if (bodySr != null)
+            {
+                bodySr.color = Color.white; // 体を白くフラッシュ
+            }
+
             // Flash shield white for parry feedback
             if (blockShield != null)
             {
@@ -630,12 +690,21 @@ namespace FightingGameBase
                 {
                     shieldSr.color = new Color(1f, 1f, 1f, 0.9f); // Pure white flash
                 }
+            }
                 
-                yield return new WaitForSeconds(0.1f);
+            yield return new WaitForSeconds(0.1f);
 
+            if (bodySr != null)
+            {
+                bodySr.color = originalColor; // 元の色に戻す
+            }
+
+            if (blockShield != null)
+            {
+                SpriteRenderer shieldSr = blockShield.GetComponent<SpriteRenderer>();
                 if (shieldSr != null)
                 {
-                    shieldSr.color = new Color(0.3f, 0.8f, 1f, 0.6f);
+                    shieldSr.color = isParrying ? new Color(0.3f, 0.8f, 1f, 0.6f) : new Color(0.3f, 0.5f, 0.7f, 0.45f);
                 }
             }
 

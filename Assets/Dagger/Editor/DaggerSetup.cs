@@ -109,11 +109,11 @@ namespace FightingGameBase.Editor
             weapon.transform.localScale = Vector3.one;
             // 通常攻撃判定（PunchHitbox）と完全に同じ位置に配置
             weapon.transform.localPosition = new Vector3(0.4f, 0.5f, 0f);
-            // 通常攻撃判定（PunchHitboxのコライダーサイズ：0.8x0.5）と完全に同じスケールに設定してサイズ警告を回避
-            weapon.transform.localScale = new Vector3(0.8f, 0.5f, 1f);
 
             SpriteRenderer weaponSr = weapon.AddComponent<SpriteRenderer>();
             weaponSr.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+            weaponSr.drawMode = SpriteDrawMode.Sliced; // Slicedモードを使用して正確なサイズを設定
+            weaponSr.size = new Vector2(0.8f, 0.5f); // 当たり判定（PunchHitboxのBoxCollider2D）と同じサイズに設定
             weaponSr.color = new Color(0.7f, 0.7f, 0.7f, 1f); // 少しグレーに設定
             weaponSr.sortingOrder = 1; // キャラクターの手前に表示
 
@@ -138,16 +138,16 @@ namespace FightingGameBase.Editor
 
             hitboxObj.SetActive(false); // 初期状態は非アクティブ
 
-            // 5. ブロック・パリー用シールドマーク
+            // 5. ブロック・パリー用シールドマーク（大剣Taikenと全く同じデザイン）
             GameObject shieldObj = new GameObject("BlockShield");
-            shieldObj.transform.SetParent(root.transform);
-            shieldObj.transform.localPosition = new Vector3(0.12f, 0.18f, 0f); // スケールに合わせて調整
+            shieldObj.transform.SetParent(visuals.transform); // 大剣と同様にVisualsの子にする
+            shieldObj.transform.localPosition = new Vector3(0.2f, 0.2f, 0f);
 
             SpriteRenderer shieldSr = shieldObj.AddComponent<SpriteRenderer>();
             // ビルトインの円形スプライト（Knob）を使ってシールドを表現
             shieldSr.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
-            shieldSr.color = new Color(0.4f, 0.9f, 0.3f, 0.55f); // 半透明ライトグリーン（俊敏なシールド）
-            shieldSr.transform.localScale = new Vector3(0.3f, 0.3f, 1f); // 大剣より小さめ
+            shieldSr.color = new Color(0.3f, 0.8f, 1.0f, 0.55f); // 大剣と同一の半透明ライトブルー
+            shieldSr.transform.localScale = new Vector3(0.45f, 0.45f, 1f); // 大剣と同一の大きさ
             shieldSr.sortingOrder = 1; // キャラクターの前面に表示
 
             shieldObj.SetActive(false); // 初期状態は非表示

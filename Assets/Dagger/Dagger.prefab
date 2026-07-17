@@ -578,3 +578,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FightingGameBase.Hitbox
   damage: 8
   ownerPlayerID: 1
+  owner: {fileID: 0}

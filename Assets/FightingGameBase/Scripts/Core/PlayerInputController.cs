@@ -20,6 +20,7 @@ namespace FightingGameBase
         public Key normalAttackKey = Key.J;     // 通常攻撃
         public Key specialAttackKey = Key.K;    // 特殊攻撃
         public Key blockKey = Key.H;            // ブロック・パリー
+        public Key dashKey = Key.L;             // ダッシュ・回避
 
         [Header("設定")]
         [Tooltip("通常攻撃キーと特殊攻撃キーの同時押しと判定する猶予時間（秒）。0.05秒くらいがちょうどいいです")]
@@ -65,6 +66,12 @@ namespace FightingGameBase
 
             // キャラクター本体に「この方向に移動して！」と命令します
             character.Move(direction);
+
+            // ダッシュ・回避キー判定
+            if (Keyboard.current[dashKey].wasPressedThisFrame)
+            {
+                character.TriggerDashOrEvade(direction);
+            }
 
             // ジャンプキーが「押された瞬間（wasPressedThisFrame）」ならジャンプします
             if (Keyboard.current[jumpKey].wasPressedThisFrame)

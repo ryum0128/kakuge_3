@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using System.Collections;
 
 namespace FightingGameBase
 {
@@ -10,20 +11,64 @@ namespace FightingGameBase
         private CharacterBase player1;
         private CharacterBase player2;
 
-        // UI References
+        // UI Canvas References
         private Canvas canvas;
+        private Font uiFont;
 
-        // P1 UI elements (RectTransforms for scaling width)
-        private RectTransform p1HpBarRect;
-        private RectTransform p1PostureBarRect;
-        private RectTransform p1ManaBarRect;
+        // Progress bar class for smooth management
+        private class ProgressBarUI
+        {
+            public string name;
+            public RectTransform bgRect;
+            public RectTransform catchUpRect;
+            public RectTransform fillRect;
+            public Image fillImage;
+            public Image catchUpImage;
+            public float currentPercent = -1f;
+            public float catchUpPercent = -1f;
+            public float maxWidth;
+        }
+
+        private ProgressBarUI p1HpBar;
+        private ProgressBarUI p1PostureBar;
+        private ProgressBarUI p1ManaBar;
+
+        private ProgressBarUI p2HpBar;
+        private ProgressBarUI p2PostureBar;
+        private ProgressBarUI p2ManaBar;
+
+        // Text references
         private Text p1NameText;
-
-        // P2 UI elements (RectTransforms for scaling width)
-        private RectTransform p2HpBarRect;
-        private RectTransform p2PostureBarRect;
-        private RectTransform p2ManaBarRect;
         private Text p2NameText;
+        private Text p1HpValueText;
+        private Text p2HpValueText;
+
+        // Timer
+        private Text timerText;
+        private float roundTimeRemaining = 99f;
+        private bool isTimerActive = true;
+
+        // Combos
+        private int p1ComboCount = 0;
+        private float p1LastHitTime = -10f;
+        private int p2ComboCount = 0;
+        private float p2LastHitTime = -10f;
+        private float comboTimeout = 1.5f;
+
+        private Text p1ComboText;
+        private Coroutine p1ComboCoroutine;
+
+        private Text p2ComboText;
+        private Coroutine p2ComboCoroutine;
+        private Coroutine shakeCoroutine;
+
+        // Cache gradients to avoid memory leaks
+        private Sprite p1HpGradient;
+        private Sprite p2HpGradient;
+        private Sprite p1PostureGradient;
+        private Sprite p2PostureGradient;
+        private Sprite p1ManaGradient;
+        private Sprite p2ManaGradient;
 
         void Awake()
         {
@@ -44,6 +89,17 @@ namespace FightingGameBase
             CreateHUD();
         }
 
+        void OnDestroy()
+        {
+            // Clean up programmatic textures to prevent memory leaks
+            if (p1HpGradient != null) { Destroy(p1HpGradient.texture); Destroy(p1HpGradient); }
+            if (p2HpGradient != null) { Destroy(p2HpGradient.texture); Destroy(p2HpGradient); }
+            if (p1PostureGradient != null) { Destroy(p1PostureGradient.texture); Destroy(p1PostureGradient); }
+            if (p2PostureGradient != null) { Destroy(p2PostureGradient.texture); Destroy(p2PostureGradient); }
+            if (p1ManaGradient != null) { Destroy(p1ManaGradient.texture); Destroy(p1ManaGradient); }
+            if (p2ManaGradient != null) { Destroy(p2ManaGradient.texture); Destroy(p2ManaGradient); }
+        }
+
         void FindPlayers()
         {
             CharacterBase[] characters = FindObjectsByType<CharacterBase>(FindObjectsSortMode.None);
@@ -51,14 +107,12 @@ namespace FightingGameBase
             player1 = null;
             player2 = null;
 
-            // Try mapping by playerID first
             foreach (CharacterBase c in characters)
             {
                 if (c.playerID == 1) player1 = c;
                 else if (c.playerID == 2) player2 = c;
             }
 
-            // Fallback: If player mapping by ID is incomplete, assign by array index
             if (player1 == null || player2 == null)
             {
                 if (characters.Length > 0) player1 = characters[0];
@@ -69,53 +123,51 @@ namespace FightingGameBase
         private Font GetSafeFont()
         {
             Font f = null;
-
-            // Try LegacyRuntime.ttf first (recommended by newer Unity versions)
-            try
-            {
-                f = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            }
-            catch (System.Exception) { }
-
-            // Try other common builtin fonts with exception safety
-            if (f == null)
+            string[] fontNames = { "LegacyRuntime.ttf", "LiberationSans.ttf", "LiberationSans-Regular.ttf", "Liberation Sans.ttf", "Arial.ttf" };
+            foreach (var fontName in fontNames)
             {
                 try
                 {
-                    f = Resources.GetBuiltinResource<Font>("LiberationSans.ttf");
+                    f = Resources.GetBuiltinResource<Font>(fontName);
+                    if (f != null) break;
                 }
                 catch (System.Exception) { }
             }
-
-            if (f == null)
-            {
-                try
-                {
-                    f = Resources.GetBuiltinResource<Font>("LiberationSans-Regular.ttf");
-                }
-                catch (System.Exception) { }
-            }
-
-            if (f == null)
-            {
-                try
-                {
-                    f = Resources.GetBuiltinResource<Font>("Liberation Sans.ttf");
-                }
-                catch (System.Exception) { }
-            }
-
-            // Fallback for older Unity versions
-            if (f == null)
-            {
-                try
-                {
-                    f = Resources.GetBuiltinResource<Font>("Arial.ttf");
-                }
-                catch (System.Exception) { }
-            }
-
             return f;
+        }
+
+        private Sprite CreateGradientSprite(Color leftColor, Color rightColor)
+        {
+            Texture2D tex = new Texture2D(128, 16);
+            tex.wrapMode = TextureWrapMode.Clamp;
+            tex.filterMode = FilterMode.Bilinear;
+            for (int y = 0; y < 16; y++)
+            {
+                for (int x = 0; x < 128; x++)
+                {
+                    Color col = Color.Lerp(leftColor, rightColor, (float)x / 127f);
+                    tex.SetPixel(x, y, col);
+                }
+            }
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, 128, 16), new Vector2(0.5f, 0.5f));
+        }
+
+        private void InitializeGradients()
+        {
+            // P1 HP Bar: Green at high health (right, near center) to yellow/red at outer edge (left)
+            p1HpGradient = CreateGradientSprite(new Color(0.1f, 0.5f, 0.15f), new Color(0.2f, 1.0f, 0.4f));
+
+            // P2 HP Bar: Green at high health (left, near center) to yellow/red at outer edge (right)
+            p2HpGradient = CreateGradientSprite(new Color(0.2f, 1.0f, 0.4f), new Color(0.1f, 0.5f, 0.15f));
+
+            // Posture: Orange to Yellow
+            p1PostureGradient = CreateGradientSprite(new Color(0.9f, 0.35f, 0.05f), new Color(1.0f, 0.85f, 0.15f));
+            p2PostureGradient = CreateGradientSprite(new Color(1.0f, 0.85f, 0.15f), new Color(0.9f, 0.35f, 0.05f));
+
+            // Mana: Dark Blue to Bright Cyan
+            p1ManaGradient = CreateGradientSprite(new Color(0.05f, 0.25f, 0.85f), new Color(0.1f, 0.75f, 1.0f));
+            p2ManaGradient = CreateGradientSprite(new Color(0.1f, 0.75f, 1.0f), new Color(0.05f, 0.25f, 0.85f));
         }
 
         void SetLayerRecursively(GameObject obj, int newLayer)
@@ -134,205 +186,536 @@ namespace FightingGameBase
             GameObject canvasObj = new GameObject("HUDCanvas");
             canvas = canvasObj.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 100; // Absolute topmost rendering
+            canvas.sortingOrder = 100;
             
             canvasObj.AddComponent<CanvasScaler>();
             canvasObj.AddComponent<GraphicRaycaster>();
             DontDestroyOnLoad(canvasObj);
 
-            // Get robust font reference
-            Font uiFont = GetSafeFont();
+            uiFont = GetSafeFont();
+            InitializeGradients();
 
-            // 2. Create P1 HUD Panel (Left Top)
-            GameObject p1Panel = new GameObject("P1_Panel");
-            p1Panel.transform.SetParent(canvasObj.transform, false);
-            RectTransform p1Rect = p1Panel.AddComponent<RectTransform>();
-            p1Rect.anchorMin = new Vector2(0, 1);
-            p1Rect.anchorMax = new Vector2(0, 1);
-            p1Rect.pivot = new Vector2(0, 1);
-            p1Rect.anchoredPosition = new Vector2(25, -25);
-            p1Rect.sizeDelta = new Vector2(280, 120);
+            // 2. Create Unified Top Header Panel
+            GameObject hudHeader = new GameObject("HUDHeader");
+            hudHeader.transform.SetParent(canvasObj.transform, false);
+            RectTransform headerRect = hudHeader.AddComponent<RectTransform>();
+            headerRect.anchorMin = new Vector2(0.5f, 1.0f);
+            headerRect.anchorMax = new Vector2(0.5f, 1.0f);
+            headerRect.pivot = new Vector2(0.5f, 1.0f);
+            headerRect.anchoredPosition = new Vector2(0, 0);
+            headerRect.sizeDelta = new Vector2(800, 110);
 
-            // Add panel background (solid dark background to ensure visibility)
-            Image p1Bg = p1Panel.AddComponent<Image>();
-            p1Bg.color = new Color(0.1f, 0.1f, 0.1f, 0.6f);
+            // Glassmorphic translucent dark background
+            Image headerBg = hudHeader.AddComponent<Image>();
+            headerBg.color = new Color(0.08f, 0.08f, 0.12f, 0.65f);
 
-            // P1 Player Name Text
-            p1NameText = CreateText(p1Panel, "P1_Name", "PLAYER 1", new Vector2(15, -15), 16, Color.white, uiFont, FontStyle.Bold);
+            // Thin metallic bottom border line
+            GameObject bottomBorder = new GameObject("Header_BottomBorder");
+            bottomBorder.transform.SetParent(hudHeader.transform, false);
+            RectTransform borderLineRect = bottomBorder.AddComponent<RectTransform>();
+            borderLineRect.anchorMin = new Vector2(0, 0);
+            borderLineRect.anchorMax = new Vector2(1, 0);
+            borderLineRect.pivot = new Vector2(0.5f, 0f);
+            borderLineRect.anchoredPosition = Vector2.zero;
+            borderLineRect.sizeDelta = new Vector2(0, 2);
+            Image borderLineImg = bottomBorder.AddComponent<Image>();
+            borderLineImg.color = new Color(0.7f, 0.7f, 0.75f, 0.8f);
 
-            // P1 HP Bar
-            p1HpBarRect = CreateProgressBar(p1Panel, "HP_Bar", new Vector2(15, -45), new Vector2(250, 15), new Color(0.2f, 0.9f, 0.3f, 0.9f));
-            CreateLabel(p1Panel, "HP_Label", "HP", new Vector2(15, -45), 10, Color.white, uiFont);
+            // 3. Create Center Timer Panel
+            GameObject timerPanel = new GameObject("Timer_Panel");
+            timerPanel.transform.SetParent(hudHeader.transform, false);
+            RectTransform timerPanelRect = timerPanel.AddComponent<RectTransform>();
+            timerPanelRect.anchorMin = new Vector2(0.5f, 1.0f);
+            timerPanelRect.anchorMax = new Vector2(0.5f, 1.0f);
+            timerPanelRect.pivot = new Vector2(0.5f, 1.0f);
+            timerPanelRect.anchoredPosition = new Vector2(0, -15);
+            timerPanelRect.sizeDelta = new Vector2(65, 65);
 
-            // P1 Posture Bar
-            p1PostureBarRect = CreateProgressBar(p1Panel, "Posture_Bar", new Vector2(15, -68), new Vector2(250, 10), new Color(1f, 0.8f, 0f, 0.9f));
-            CreateLabel(p1Panel, "Posture_Label", "POSTURE", new Vector2(15, -68), 8, Color.white, uiFont);
+            // Circular frame for timer
+            Image timerFrame = timerPanel.AddComponent<Image>();
+            timerFrame.sprite = Resources.GetBuiltinResource<Sprite>("UI/Skin/Knob.psd");
+            timerFrame.color = new Color(0.12f, 0.12f, 0.16f, 0.9f);
+            
+            // Thin border ring for timer circle
+            GameObject timerRing = new GameObject("Timer_Ring");
+            timerRing.transform.SetParent(timerPanel.transform, false);
+            RectTransform ringRect = timerRing.AddComponent<RectTransform>();
+            ringRect.anchorMin = Vector2.zero;
+            ringRect.anchorMax = Vector2.one;
+            ringRect.sizeDelta = new Vector2(4, 4);
+            Image ringImg = timerRing.AddComponent<Image>();
+            ringImg.sprite = Resources.GetBuiltinResource<Sprite>("UI/Skin/Knob.psd");
+            ringImg.color = new Color(0.7f, 0.7f, 0.75f, 0.8f);
+            timerRing.transform.SetAsFirstSibling();
 
-            // P1 Mana Bar
-            p1ManaBarRect = CreateProgressBar(p1Panel, "Mana_Bar", new Vector2(15, -88), new Vector2(250, 10), new Color(0f, 0.6f, 1f, 0.9f));
-            CreateLabel(p1Panel, "Mana_Label", "MANA", new Vector2(15, -88), 8, Color.white, uiFont);
+            timerText = CreateTextWithShadow(timerPanel, "Timer_Text", "99", new Vector2(0, 0), 28, new Color(1.0f, 0.85f, 0.2f), uiFont, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), 60);
+            CreateTextWithShadow(timerPanel, "Round_Label", "ROUND 1", new Vector2(0, -42), 9, new Color(0.7f, 0.7f, 0.75f, 0.85f), uiFont, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), 80);
 
+            // 4. Create P1 HUD elements (Left side, pivot grows leftwards from center)
+            p1NameText = CreateTextWithShadow(hudHeader, "P1_Name", "PLAYER 1", new Vector2(-320, -12), 22, Color.white, uiFont, TextAnchor.MiddleLeft, new Vector2(0.5f, 1.0f), new Vector2(0.0f, 1.0f));
+            p1HpBar = CreateProgressBar(hudHeader, "P1_HP_Bar", new Vector2(-325, -60), new Vector2(280, 20), p1HpGradient, false);
+            p1HpValueText = CreateTextWithShadow(hudHeader, "P1_HP_Value", "100%", new Vector2(-50, -60), 12, Color.white, uiFont, TextAnchor.MiddleRight, new Vector2(0.5f, 1.0f), new Vector2(1.0f, 0.5f), 80);
+            p1PostureBar = CreateProgressBar(hudHeader, "P1_Posture_Bar", new Vector2(-325, -83), new Vector2(280, 8), p1PostureGradient, false);
+            p1ManaBar = CreateProgressBar(hudHeader, "P1_Mana_Bar", new Vector2(-325, -94), new Vector2(280, 8), p1ManaGradient, false);
 
-            // 3. Create P2 HUD Panel (Right Top)
-            GameObject p2Panel = new GameObject("P2_Panel");
-            p2Panel.transform.SetParent(canvasObj.transform, false);
-            RectTransform p2Rect = p2Panel.AddComponent<RectTransform>();
-            p2Rect.anchorMin = new Vector2(1, 1);
-            p2Rect.anchorMax = new Vector2(1, 1);
-            p2Rect.pivot = new Vector2(1, 1);
-            p2Rect.anchoredPosition = new Vector2(-25, -25);
-            p2Rect.sizeDelta = new Vector2(280, 120);
+            CreateLabel(hudHeader, "P1_HP_Label", "HP", new Vector2(-320, -60), 9, new Color(1f, 1f, 1f, 0.75f), uiFont, TextAnchor.MiddleLeft, new Vector2(0.5f, 1.0f));
+            CreateLabel(hudHeader, "P1_Posture_Label", "POSTURE", new Vector2(-320, -83), 7, new Color(1f, 1f, 1f, 0.75f), uiFont, TextAnchor.MiddleLeft, new Vector2(0.5f, 1.0f));
+            CreateLabel(hudHeader, "P1_Mana_Label", "MANA", new Vector2(-320, -94), 7, new Color(1f, 1f, 1f, 0.75f), uiFont, TextAnchor.MiddleLeft, new Vector2(0.5f, 1.0f));
 
-            // Add panel background
-            Image p2Bg = p2Panel.AddComponent<Image>();
-            p2Bg.color = new Color(0.1f, 0.1f, 0.1f, 0.6f);
+            // 5. Create P2 HUD elements (Right side, pivot grows rightwards from center)
+            p2NameText = CreateTextWithShadow(hudHeader, "P2_Name", "PLAYER 2", new Vector2(320, -12), 22, Color.white, uiFont, TextAnchor.MiddleRight, new Vector2(0.5f, 1.0f), new Vector2(1.0f, 1.0f));
+            p2HpBar = CreateProgressBar(hudHeader, "P2_HP_Bar", new Vector2(325, -60), new Vector2(280, 20), p2HpGradient, true);
+            p2HpValueText = CreateTextWithShadow(hudHeader, "P2_HP_Value", "100%", new Vector2(50, -60), 12, Color.white, uiFont, TextAnchor.MiddleLeft, new Vector2(0.5f, 1.0f), new Vector2(0.0f, 0.5f), 80);
+            p2PostureBar = CreateProgressBar(hudHeader, "P2_Posture_Bar", new Vector2(325, -83), new Vector2(280, 8), p2PostureGradient, true);
+            p2ManaBar = CreateProgressBar(hudHeader, "P2_Mana_Bar", new Vector2(325, -94), new Vector2(280, 8), p2ManaGradient, true);
 
-            // P2 Player Name Text
-            p2NameText = CreateText(p2Panel, "P2_Name", "PLAYER 2", new Vector2(-15, -15), 16, Color.white, uiFont, FontStyle.Bold, TextAnchor.UpperRight);
+            CreateLabel(hudHeader, "P2_HP_Label", "HP", new Vector2(320, -60), 9, new Color(1f, 1f, 1f, 0.75f), uiFont, TextAnchor.MiddleRight, new Vector2(0.5f, 1.0f));
+            CreateLabel(hudHeader, "P2_Posture_Label", "POSTURE", new Vector2(320, -83), 7, new Color(1f, 1f, 1f, 0.75f), uiFont, TextAnchor.MiddleRight, new Vector2(0.5f, 1.0f));
+            CreateLabel(hudHeader, "P2_Mana_Label", "MANA", new Vector2(320, -94), 7, new Color(1f, 1f, 1f, 0.75f), uiFont, TextAnchor.MiddleRight, new Vector2(0.5f, 1.0f));
 
-            // P2 HP Bar
-            p2HpBarRect = CreateProgressBar(p2Panel, "HP_Bar", new Vector2(-15, -45), new Vector2(250, 15), new Color(0.2f, 0.9f, 0.3f, 0.9f), true);
-            CreateLabel(p2Panel, "HP_Label", "HP", new Vector2(-15, -45), 10, Color.white, uiFont, TextAnchor.UpperRight);
+            // 6. Create Combo Counter Text Fields
+            p1ComboText = CreateTextWithShadow(canvasObj, "P1_Combo", "", new Vector2(-280, -140), 24, new Color(1.0f, 0.85f, 0.2f), uiFont, TextAnchor.MiddleLeft, new Vector2(0.5f, 1.0f), new Vector2(0f, 1.0f));
+            p1ComboText.gameObject.SetActive(false);
 
-            // P2 Posture Bar
-            p2PostureBarRect = CreateProgressBar(p2Panel, "Posture_Bar", new Vector2(-15, -68), new Vector2(250, 10), new Color(1f, 0.8f, 0f, 0.9f), true);
-            CreateLabel(p2Panel, "Posture_Label", "POSTURE", new Vector2(-15, -68), 8, Color.white, uiFont, TextAnchor.UpperRight);
+            p2ComboText = CreateTextWithShadow(canvasObj, "P2_Combo", "", new Vector2(280, -140), 24, new Color(1.0f, 0.85f, 0.2f), uiFont, TextAnchor.MiddleRight, new Vector2(0.5f, 1.0f), new Vector2(1f, 1.0f));
+            p2ComboText.gameObject.SetActive(false);
 
-            // P2 Mana Bar
-            p2ManaBarRect = CreateProgressBar(p2Panel, "Mana_Bar", new Vector2(-15, -88), new Vector2(250, 10), new Color(0f, 0.6f, 1f, 0.9f), true);
-            CreateLabel(p2Panel, "Mana_Label", "MANA", new Vector2(-15, -88), 8, Color.white, uiFont, TextAnchor.UpperRight);
-
-            // Forcibly apply UI Layer (Layer 5) recursively
+            // Force UI Layer (5) recursively
             SetLayerRecursively(canvasObj, 5);
         }
 
-        Text CreateText(GameObject parent, string name, string defaultText, Vector2 pos, int fontSize, Color color, Font uiFont, FontStyle style = FontStyle.Normal, TextAnchor alignment = TextAnchor.UpperLeft)
+        Text CreateTextWithShadow(GameObject parent, string name, string defaultText, Vector2 pos, int fontSize, Color color, Font uiFont, TextAnchor alignment, Vector2 anchor, Vector2 pivot, float width = 300)
         {
             GameObject txtObj = new GameObject(name);
             txtObj.transform.SetParent(parent.transform, false);
             RectTransform rect = txtObj.AddComponent<RectTransform>();
-            
-            if (alignment == TextAnchor.UpperRight)
-            {
-                rect.anchorMin = new Vector2(1, 1);
-                rect.anchorMax = new Vector2(1, 1);
-                rect.pivot = new Vector2(1, 1);
-            }
-            else
-            {
-                rect.anchorMin = new Vector2(0, 1);
-                rect.anchorMax = new Vector2(0, 1);
-                rect.pivot = new Vector2(0, 1);
-            }
+            rect.anchorMin = anchor;
+            rect.anchorMax = anchor;
+            rect.pivot = pivot;
             rect.anchoredPosition = pos;
-            rect.sizeDelta = new Vector2(200, 30);
+            rect.sizeDelta = new Vector2(width, fontSize + 12);
 
-            if (uiFont != null)
-            {
-                Text text = txtObj.AddComponent<Text>();
-                text.font = uiFont;
-                text.text = defaultText;
-                text.fontSize = fontSize;
-                text.color = color;
-                text.fontStyle = style;
-                text.alignment = alignment;
-                return text;
-            }
+            Text text = txtObj.AddComponent<Text>();
+            text.font = uiFont;
+            text.text = defaultText;
+            text.fontSize = fontSize;
+            text.color = color;
+            text.fontStyle = FontStyle.Bold;
+            text.alignment = alignment;
 
-            return null;
+            Shadow shadow = txtObj.AddComponent<Shadow>();
+            shadow.effectColor = new Color(0f, 0f, 0f, 0.85f);
+            shadow.effectDistance = new Vector2(2f, -2f);
+
+            return text;
         }
 
-        void CreateLabel(GameObject parent, string labelText, string text, Vector2 pos, int fontSize, Color color, Font uiFont, TextAnchor alignment = TextAnchor.UpperLeft)
+        void CreateLabel(GameObject parent, string labelName, string text, Vector2 pos, int fontSize, Color color, Font uiFont, TextAnchor alignment, Vector2 anchor)
         {
-            GameObject labelObj = new GameObject(labelText);
+            GameObject labelObj = new GameObject(labelName);
             labelObj.transform.SetParent(parent.transform, false);
             RectTransform rect = labelObj.AddComponent<RectTransform>();
             
-            if (alignment == TextAnchor.UpperRight)
-            {
-                rect.anchorMin = new Vector2(1, 1);
-                rect.anchorMax = new Vector2(1, 1);
-                rect.pivot = new Vector2(1, 1);
-                rect.anchoredPosition = pos + new Vector2(-5, -2);
-            }
-            else
-            {
-                rect.anchorMin = new Vector2(0, 1);
-                rect.anchorMax = new Vector2(0, 1);
-                rect.pivot = new Vector2(0, 1);
-                rect.anchoredPosition = pos + new Vector2(5, -2);
-            }
-            rect.sizeDelta = new Vector2(100, 20);
+            rect.anchorMin = anchor;
+            rect.anchorMax = anchor;
+            rect.pivot = (alignment == TextAnchor.MiddleLeft) ? new Vector2(0f, 0.5f) : new Vector2(1f, 0.5f);
+            rect.anchoredPosition = pos + ((alignment == TextAnchor.MiddleLeft) ? new Vector2(5, -2) : new Vector2(-5, -2));
+            rect.sizeDelta = new Vector2(100, fontSize + 8);
 
-            if (uiFont != null)
-            {
-                Text t = labelObj.AddComponent<Text>();
-                t.font = uiFont;
-                t.text = text;
-                t.fontSize = fontSize;
-                t.color = new Color(color.r, color.g, color.b, 0.7f);
-                t.fontStyle = FontStyle.Bold;
-                t.alignment = alignment;
-            }
+            Text t = labelObj.AddComponent<Text>();
+            t.font = uiFont;
+            t.text = text;
+            t.fontSize = fontSize;
+            t.color = new Color(color.r, color.g, color.b, 0.75f);
+            t.fontStyle = FontStyle.Bold;
+            t.alignment = alignment;
+
+            Shadow shadow = labelObj.AddComponent<Shadow>();
+            shadow.effectColor = new Color(0f, 0f, 0f, 0.6f);
+            shadow.effectDistance = new Vector2(1f, -1f);
         }
 
-        RectTransform CreateProgressBar(GameObject parent, string name, Vector2 pos, Vector2 size, Color color, bool alignRight = false)
+        private ProgressBarUI CreateProgressBar(GameObject parent, string name, Vector2 pos, Vector2 size, Sprite gradientSprite, bool isP2)
         {
-            // Outer container (Background)
-            GameObject barBgObj = new GameObject(name + "_Bg");
-            barBgObj.transform.SetParent(parent.transform, false);
-            RectTransform bgRect = barBgObj.AddComponent<RectTransform>();
-            
-            if (alignRight)
+            ProgressBarUI bar = new ProgressBarUI();
+            bar.name = name;
+            bar.maxWidth = size.x;
+
+            // 0. Soft outer glow behind HP bars for rich sci-fi aesthetics
+            if (name.Contains("HP_Bar"))
             {
-                bgRect.anchorMin = new Vector2(1, 1);
-                bgRect.anchorMax = new Vector2(1, 1);
-                bgRect.pivot = new Vector2(1, 1);
+                GameObject glowObj = new GameObject(name + "_Glow");
+                glowObj.transform.SetParent(parent.transform, false);
+                RectTransform glowRect = glowObj.AddComponent<RectTransform>();
+                glowRect.anchorMin = isP2 ? new Vector2(0.5f, 1.0f) : new Vector2(0.5f, 1.0f);
+                glowRect.anchorMax = isP2 ? new Vector2(0.5f, 1.0f) : new Vector2(0.5f, 1.0f);
+                glowRect.pivot = isP2 ? new Vector2(1f, 0.5f) : new Vector2(0f, 0.5f);
+                glowRect.anchoredPosition = pos;
+                glowRect.sizeDelta = size + new Vector2(12, 12);
+                Image glowImg = glowObj.AddComponent<Image>();
+                glowImg.color = isP2 ? new Color(1f, 0.35f, 0.1f, 0.2f) : new Color(0.1f, 0.65f, 1f, 0.2f);
+            }
+
+            // 1. Frame Border
+            GameObject borderObj = new GameObject(name + "_Border");
+            borderObj.transform.SetParent(parent.transform, false);
+            RectTransform borderRect = borderObj.AddComponent<RectTransform>();
+            borderRect.anchorMin = isP2 ? new Vector2(0.5f, 1.0f) : new Vector2(0.5f, 1.0f);
+            borderRect.anchorMax = isP2 ? new Vector2(0.5f, 1.0f) : new Vector2(0.5f, 1.0f);
+            borderRect.pivot = isP2 ? new Vector2(1f, 0.5f) : new Vector2(0f, 0.5f);
+            borderRect.anchoredPosition = pos;
+            borderRect.sizeDelta = size + new Vector2(4, 4);
+
+            Image borderImg = borderObj.AddComponent<Image>();
+            if (name.Contains("HP_Bar"))
+            {
+                borderImg.color = isP2 ? new Color(1f, 0.45f, 0.15f, 0.85f) : new Color(0.15f, 0.75f, 1f, 0.85f); // Neon Cyan for P1, Fire Orange for P2!
             }
             else
             {
-                bgRect.anchorMin = new Vector2(0, 1);
-                bgRect.anchorMax = new Vector2(0, 1);
-                bgRect.pivot = new Vector2(0, 1);
+                borderImg.color = new Color(0.2f, 0.22f, 0.25f, 0.85f); // Sleek border frame
             }
-            bgRect.anchoredPosition = pos;
+
+            // 2. Background
+            GameObject bgObj = new GameObject(name + "_Bg");
+            bgObj.transform.SetParent(borderObj.transform, false);
+            RectTransform bgRect = bgObj.AddComponent<RectTransform>();
+            bgRect.anchorMin = new Vector2(0.5f, 0.5f);
+            bgRect.anchorMax = new Vector2(0.5f, 0.5f);
+            bgRect.pivot = new Vector2(0.5f, 0.5f);
+            bgRect.anchoredPosition = Vector2.zero;
             bgRect.sizeDelta = size;
 
-            Image bgImage = barBgObj.AddComponent<Image>();
-            bgImage.color = new Color(0.05f, 0.05f, 0.05f, 0.7f); // Dark solid background
+            Image bgImg = bgObj.AddComponent<Image>();
+            bgImg.color = new Color(0.04f, 0.04f, 0.06f, 0.9f);
+            bar.bgRect = bgRect;
 
-            // Inner fill (Active part)
-            GameObject barFillObj = new GameObject(name + "_Fill");
-            barFillObj.transform.SetParent(barBgObj.transform, false);
-            RectTransform fillRect = barFillObj.AddComponent<RectTransform>();
-            
-            // Align anchors for horizontal scaling
-            if (alignRight)
+            // 3. CatchUp Fill
+            GameObject catchUpObj = new GameObject(name + "_CatchUp");
+            catchUpObj.transform.SetParent(bgObj.transform, false);
+            RectTransform catchUpRect = catchUpObj.AddComponent<RectTransform>();
+            if (isP2)
             {
-                fillRect.anchorMin = new Vector2(1, 0); // Bottom Right
-                fillRect.anchorMax = new Vector2(1, 1); // Top Right
-                fillRect.pivot = new Vector2(1, 0.5f);  // Pivot Right
+                catchUpRect.anchorMin = new Vector2(1, 0);
+                catchUpRect.anchorMax = new Vector2(1, 1);
+                catchUpRect.pivot = new Vector2(1, 0.5f);
             }
             else
             {
-                fillRect.anchorMin = new Vector2(0, 0); // Bottom Left
-                fillRect.anchorMax = new Vector2(0, 1); // Top Left
-                fillRect.pivot = new Vector2(0, 0.5f);  // Pivot Left
+                catchUpRect.anchorMin = new Vector2(0, 0);
+                catchUpRect.anchorMax = new Vector2(0, 1);
+                catchUpRect.pivot = new Vector2(0, 0.5f);
+            }
+            catchUpRect.anchoredPosition = Vector2.zero;
+            catchUpRect.sizeDelta = new Vector2(size.x, 0f);
+
+            Image catchUpImg = catchUpObj.AddComponent<Image>();
+            catchUpImg.color = new Color(0.85f, 0.2f, 0.12f, 0.9f); // Red warning color
+            bar.catchUpRect = catchUpRect;
+            bar.catchUpImage = catchUpImg;
+
+            // 4. Gradient Fill
+            GameObject fillObj = new GameObject(name + "_Fill");
+            fillObj.transform.SetParent(bgObj.transform, false);
+            RectTransform fillRect = fillObj.AddComponent<RectTransform>();
+            if (isP2)
+            {
+                fillRect.anchorMin = new Vector2(1, 0);
+                fillRect.anchorMax = new Vector2(1, 1);
+                fillRect.pivot = new Vector2(1, 0.5f);
+            }
+            else
+            {
+                fillRect.anchorMin = new Vector2(0, 0);
+                fillRect.anchorMax = new Vector2(0, 1);
+                fillRect.pivot = new Vector2(0, 0.5f);
             }
             fillRect.anchoredPosition = Vector2.zero;
             fillRect.sizeDelta = new Vector2(size.x, 0f);
 
-            Image fillImage = barFillObj.AddComponent<Image>();
-            fillImage.color = color; // Solid color
+            Image fillImg = fillObj.AddComponent<Image>();
+            if (gradientSprite != null)
+            {
+                fillImg.sprite = gradientSprite;
+                fillImg.type = Image.Type.Simple;
+                fillImg.color = Color.white;
+            }
+            else
+            {
+                fillImg.color = Color.green;
+            }
+            bar.fillRect = fillRect;
+            bar.fillImage = fillImg;
 
-            return fillRect;
+            return bar;
         }
 
-        void SetBarValue(RectTransform barRect, float percent, float maxWidth)
+        private void SetBarValue(ProgressBarUI bar, float percent)
         {
-            if (barRect == null) return;
-            float targetWidth = maxWidth * Mathf.Clamp01(percent);
-            barRect.sizeDelta = new Vector2(targetWidth, 0f);
+            if (bar == null) return;
+            
+            // Initialization check
+            if (bar.currentPercent < 0f)
+            {
+                bar.currentPercent = percent;
+                bar.catchUpPercent = percent;
+            }
+            else
+            {
+                bar.currentPercent = Mathf.Clamp01(percent);
+            }
+
+            // Immediately resize foreground
+            float targetWidth = bar.maxWidth * bar.currentPercent;
+            bar.fillRect.sizeDelta = new Vector2(targetWidth, 0f);
+
+            // Lerp catchup bar
+            if (bar.catchUpPercent > bar.currentPercent)
+            {
+                bar.catchUpPercent = Mathf.MoveTowards(bar.catchUpPercent, bar.currentPercent, Time.deltaTime * 0.35f);
+            }
+            else
+            {
+                bar.catchUpPercent = bar.currentPercent;
+            }
+            bar.catchUpRect.sizeDelta = new Vector2(bar.maxWidth * bar.catchUpPercent, 0f);
+        }
+
+        public void TriggerScreenShake(float duration, float magnitude)
+        {
+            if (shakeCoroutine != null) StopCoroutine(shakeCoroutine);
+            shakeCoroutine = StartCoroutine(ScreenShakeRoutine(duration, magnitude));
+        }
+
+        private IEnumerator ScreenShakeRoutine(float duration, float magnitude)
+        {
+            Camera cam = Camera.main;
+            if (cam == null) yield break;
+
+            Vector3 originalPos = cam.transform.localPosition;
+            float elapsed = 0f;
+
+            while (elapsed < duration)
+            {
+                // If hit stop is active, we use realTimeDeltaTime
+                float dt = Time.unscaledDeltaTime;
+                elapsed += dt;
+
+                float x = Random.Range(-1f, 1f) * magnitude;
+                float y = Random.Range(-1f, 1f) * magnitude;
+
+                cam.transform.localPosition = new Vector3(originalPos.x + x, originalPos.y + y, originalPos.z);
+                yield return null;
+            }
+
+            cam.transform.localPosition = originalPos;
+        }
+
+        public void TriggerHitStop(int frames)
+        {
+            StartCoroutine(HitStopRoutine(frames));
+        }
+
+        private IEnumerator HitStopRoutine(int frames)
+        {
+            float oldTimeScale = Time.timeScale;
+            Time.timeScale = 0f;
+
+            for (int i = 0; i < frames; i++)
+            {
+                yield return null; // Resumes regardless of timeScale
+            }
+
+            Time.timeScale = oldTimeScale;
+        }
+
+        public void RegisterHit(int victimPlayerID, int damage, Vector3 position)
+        {
+            // Spawn Floating Damage text
+            ShowDamageText(position, damage);
+
+            // Trigger visual screen shake on hit
+            TriggerScreenShake(0.08f, 0.05f);
+
+            // Combo calculations
+            if (victimPlayerID == 2)
+            {
+                // Player 1 landed hit on Player 2
+                if (Time.time - p1LastHitTime <= comboTimeout)
+                {
+                    p1ComboCount++;
+                }
+                else
+                {
+                    p1ComboCount = 1;
+                }
+                p1LastHitTime = Time.time;
+                ShowCombo(1, p1ComboCount);
+            }
+            else if (victimPlayerID == 1)
+            {
+                // Player 2 landed hit on Player 1
+                if (Time.time - p2LastHitTime <= comboTimeout)
+                {
+                    p2ComboCount++;
+                }
+                else
+                {
+                    p2ComboCount = 1;
+                }
+                p2LastHitTime = Time.time;
+                ShowCombo(2, p2ComboCount);
+            }
+        }
+
+        public void ShowCombo(int playerID, int hits)
+        {
+            if (playerID == 1)
+            {
+                if (p1ComboCoroutine != null) StopCoroutine(p1ComboCoroutine);
+                p1ComboCoroutine = StartCoroutine(ShowComboRoutine(1, hits));
+            }
+            else
+            {
+                if (p2ComboCoroutine != null) StopCoroutine(p2ComboCoroutine);
+                p2ComboCoroutine = StartCoroutine(ShowComboRoutine(2, hits));
+            }
+        }
+
+        private IEnumerator ShowComboRoutine(int playerID, int hits)
+        {
+            Text comboTxt = playerID == 1 ? p1ComboText : p2ComboText;
+            if (comboTxt == null) yield break;
+
+            if (hits < 2)
+            {
+                comboTxt.gameObject.SetActive(false);
+                yield break;
+            }
+
+            comboTxt.gameObject.SetActive(true);
+            comboTxt.text = hits + " HITS!";
+            
+            // Change color dynamically based on hit intensity
+            Color comboColor = hits > 8 ? new Color(1.0f, 0.35f, 0.1f) : new Color(1.0f, 0.85f, 0.15f);
+            comboTxt.color = comboColor;
+
+            // Scale pop animation
+            float elapsed = 0f;
+            float popDuration = 0.1f;
+            while (elapsed < popDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / popDuration;
+                float scale = Mathf.Lerp(1.5f, 1.0f, t * t);
+                comboTxt.transform.localScale = new Vector3(scale, scale, 1.0f);
+                yield return null;
+            }
+            comboTxt.transform.localScale = Vector3.one;
+
+            yield return new WaitForSeconds(comboTimeout);
+
+            // Fade out
+            elapsed = 0f;
+            float fadeDuration = 0.3f;
+            while (elapsed < fadeDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / fadeDuration;
+                Color col = comboTxt.color;
+                col.a = 1.0f - t;
+                comboTxt.color = col;
+                yield return null;
+            }
+
+            comboTxt.gameObject.SetActive(false);
+        }
+
+        public void ShowDamageText(Vector3 worldPos, int damage)
+        {
+            if (canvas == null) return;
+
+            GameObject dmgObj = new GameObject("DamageText");
+            dmgObj.transform.SetParent(canvas.transform, false);
+
+            RectTransform rect = dmgObj.AddComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(150, 50);
+
+            Text text = dmgObj.AddComponent<Text>();
+            text.font = uiFont;
+            text.fontSize = 28;
+            text.fontStyle = FontStyle.Bold;
+            text.alignment = TextAnchor.MiddleCenter;
+            text.text = damage.ToString();
+            text.color = new Color(1.0f, 0.2f, 0.15f, 1.0f);
+
+            // Shadow duplicate
+            GameObject shadowObj = new GameObject("Shadow");
+            shadowObj.transform.SetParent(dmgObj.transform, false);
+            RectTransform shadowRect = shadowObj.AddComponent<RectTransform>();
+            shadowRect.anchoredPosition = new Vector2(2, -2);
+            shadowRect.sizeDelta = rect.sizeDelta;
+            Text shadowText = shadowObj.AddComponent<Text>();
+            shadowText.font = uiFont;
+            shadowText.fontSize = 28;
+            shadowText.fontStyle = FontStyle.Bold;
+            shadowText.alignment = TextAnchor.MiddleCenter;
+            shadowText.text = damage.ToString();
+            shadowText.color = Color.black;
+
+            StartCoroutine(AnimateDamageText(dmgObj, rect, text, shadowText, worldPos));
+        }
+
+        private IEnumerator AnimateDamageText(GameObject obj, RectTransform rect, Text text, Text shadow, Vector3 worldPos)
+        {
+            Camera cam = Camera.main;
+            Vector2 screenPos = Vector2.zero;
+            if (cam != null)
+            {
+                screenPos = cam.WorldToScreenPoint(worldPos + Vector3.up * 1.2f);
+            }
+
+            // Slight random horizontal scatter
+            screenPos.x += Random.Range(-25f, 25f);
+            rect.position = screenPos;
+
+            float elapsed = 0f;
+            float duration = 0.75f;
+            Vector3 startPos = rect.anchoredPosition;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+
+                // Arc path upward
+                rect.anchoredPosition = startPos + new Vector3(0f, t * 90f, 0f);
+
+                // Punch scale animation
+                float scale = 1.0f;
+                if (t < 0.15f)
+                {
+                    scale = Mathf.Lerp(1.0f, 1.4f, t / 0.15f);
+                }
+                else
+                {
+                    scale = Mathf.Lerp(1.4f, 0.9f, (t - 0.15f) / 0.85f);
+                }
+                rect.localScale = new Vector3(scale, scale, 1.0f);
+
+                // Fade out
+                Color col = text.color;
+                col.a = 1.0f - t;
+                text.color = col;
+
+                Color sCol = shadow.color;
+                sCol.a = (1.0f - t) * 0.85f;
+                shadow.color = sCol;
+
+                yield return null;
+            }
+
+            Destroy(obj);
         }
 
         void Update()
@@ -342,28 +725,98 @@ namespace FightingGameBase
                 FindPlayers();
             }
 
+            // Round Timer calculation
+            if (isTimerActive && GameManager.Instance != null && GameManager.Instance.IsPlaying)
+            {
+                roundTimeRemaining -= Time.deltaTime;
+                if (roundTimeRemaining <= 0)
+                {
+                    roundTimeRemaining = 0;
+                    isTimerActive = false;
+                    
+                    // Time out resolution: player with lower HP loses
+                    if (player1 != null && player2 != null)
+                    {
+                        if (player1.currentHP < player2.currentHP)
+                        {
+                            player1.TakeDamage(player1.maxHP);
+                        }
+                        else if (player2.currentHP < player1.currentHP)
+                        {
+                            player2.TakeDamage(player2.maxHP);
+                        }
+                        else
+                        {
+                            player1.TakeDamage(player1.maxHP);
+                            player2.TakeDamage(player2.maxHP);
+                        }
+                    }
+                }
+            }
+
+            // Update timer text and alert pulses
+            if (timerText != null)
+            {
+                timerText.text = Mathf.CeilToInt(roundTimeRemaining).ToString();
+                if (roundTimeRemaining <= 10f && roundTimeRemaining > 0f)
+                {
+                    timerText.color = new Color(1.0f, 0.25f, 0.25f);
+                    float pulse = 1f + Mathf.PingPong(Time.time * 4f, 0.15f);
+                    timerText.transform.parent.localScale = new Vector3(pulse, pulse, 1f);
+                }
+                else
+                {
+                    timerText.color = new Color(1.0f, 0.85f, 0.2f);
+                    timerText.transform.parent.localScale = Vector3.one;
+                }
+            }
+
             // Update P1 UI
             if (player1 != null)
             {
                 if (p1NameText != null)
                 {
-                    p1NameText.text = player1.gameObject.name.Replace("(Clone)", "").ToUpper() + " (P1)";
+                    string rawName = player1.gameObject.name.Replace("(Clone)", "").ToUpper();
+                    p1NameText.text = $"<color=#FFD700>P1</color>  <color=#00e5ff>{rawName}</color>";
                 }
                 
                 float maxHp = player1.maxHP > 0 ? player1.maxHP : 100f;
-                SetBarValue(p1HpBarRect, (float)player1.currentHP / maxHp, 250f);
+                float hpPercent = (float)player1.currentHP / maxHp;
+                SetBarValue(p1HpBar, hpPercent);
+
+                if (p1HpValueText != null)
+                {
+                    int hpPercentInt = Mathf.CeilToInt(hpPercent * 100f);
+                    p1HpValueText.text = $"{hpPercentInt}%";
+                }
                 
                 float maxPos = player1.maxPosture > 0 ? player1.maxPosture : 100f;
-                SetBarValue(p1PostureBarRect, player1.currentPosture / maxPos, 250f);
+                float postPercent = player1.currentPosture / maxPos;
+                SetBarValue(p1PostureBar, postPercent);
                 
                 float maxMana = player1.maxMana > 0 ? player1.maxMana : 100f;
-                SetBarValue(p1ManaBarRect, player1.currentMana / maxMana, 250f);
+                float manaPercent = player1.currentMana / maxMana;
+                SetBarValue(p1ManaBar, manaPercent);
+
+                // Low HP alarm flash
+                if (hpPercent < 0.3f && player1.currentHP > 0)
+                {
+                    p1HpBar.fillImage.color = Color.Lerp(Color.white, new Color(1.0f, 0.3f, 0.2f), Mathf.PingPong(Time.time * 6f, 1.0f));
+                }
+                else
+                {
+                    p1HpBar.fillImage.color = Color.white;
+                }
             }
             else
             {
-                SetBarValue(p1HpBarRect, 0f, 250f);
-                SetBarValue(p1PostureBarRect, 0f, 250f);
-                SetBarValue(p1ManaBarRect, 0f, 250f);
+                SetBarValue(p1HpBar, 0f);
+                SetBarValue(p1PostureBar, 0f);
+                SetBarValue(p1ManaBar, 0f);
+                if (p1HpValueText != null)
+                {
+                    p1HpValueText.text = "0%";
+                }
             }
 
             // Update P2 UI
@@ -371,23 +824,47 @@ namespace FightingGameBase
             {
                 if (p2NameText != null)
                 {
-                    p2NameText.text = player2.gameObject.name.Replace("(Clone)", "").ToUpper() + " (P2)";
+                    string rawName = player2.gameObject.name.Replace("(Clone)", "").ToUpper();
+                    p2NameText.text = $"<color=#ff5500>{rawName}</color>  <color=#FFD700>P2</color>";
                 }
                 
                 float maxHp = player2.maxHP > 0 ? player2.maxHP : 100f;
-                SetBarValue(p2HpBarRect, (float)player2.currentHP / maxHp, 250f);
+                float hpPercent = (float)player2.currentHP / maxHp;
+                SetBarValue(p2HpBar, hpPercent);
+
+                if (p2HpValueText != null)
+                {
+                    int hpPercentInt = Mathf.CeilToInt(hpPercent * 100f);
+                    p2HpValueText.text = $"{hpPercentInt}%";
+                }
                 
                 float maxPos = player2.maxPosture > 0 ? player2.maxPosture : 100f;
-                SetBarValue(p2PostureBarRect, player2.currentPosture / maxPos, 250f);
+                float postPercent = player2.currentPosture / maxPos;
+                SetBarValue(p2PostureBar, postPercent);
                 
                 float maxMana = player2.maxMana > 0 ? player2.maxMana : 100f;
-                SetBarValue(p2ManaBarRect, player2.currentMana / maxMana, 250f);
+                float manaPercent = player2.currentMana / maxMana;
+                SetBarValue(p2ManaBar, manaPercent);
+
+                // Low HP alarm flash
+                if (hpPercent < 0.3f && player2.currentHP > 0)
+                {
+                    p2HpBar.fillImage.color = Color.Lerp(Color.white, new Color(1.0f, 0.3f, 0.2f), Mathf.PingPong(Time.time * 6f, 1.0f));
+                }
+                else
+                {
+                    p2HpBar.fillImage.color = Color.white;
+                }
             }
             else
             {
-                SetBarValue(p2HpBarRect, 0f, 250f);
-                SetBarValue(p2PostureBarRect, 0f, 250f);
-                SetBarValue(p2ManaBarRect, 0f, 250f);
+                SetBarValue(p2HpBar, 0f);
+                SetBarValue(p2PostureBar, 0f);
+                SetBarValue(p2ManaBar, 0f);
+                if (p2HpValueText != null)
+                {
+                    p2HpValueText.text = "0%";
+                }
             }
         }
     }

@@ -32,9 +32,15 @@ namespace FightingGameBase
         public int specialSlashDamage = 8;
 
         private Transform visualsTransform;
+        private GameObject blockShield;
         private bool isSwinging = false;
         private bool isSpecialAttacking = false;
         private bool isGuardBroken = false;
+
+        private Coroutine normalAttackCoroutine;
+        private Coroutine specialAttackCoroutine;
+
+        public override bool IsAttacking => isSwinging || isSpecialAttacking;
         private float guardBreakDuration = 1.5f;
         
         // DeepWoken Parry Cooldown variables
@@ -65,6 +71,56 @@ namespace FightingGameBase
             {
                 Debug.LogError($"[DaggerCharacter] 見た目オブジェクト（Visuals）が見つかりませんでした！");
             }
+            else
+            {
+                // Automatically adjust weapon sprite size to match the PunchHitbox collider size at runtime
+                Hitbox hitbox = GetComponentInChildren<Hitbox>(true);
+                if (hitbox != null)
+                {
+                    BoxCollider2D boxCol = hitbox.GetComponent<BoxCollider2D>();
+                    if (boxCol != null)
+                    {
+                        SpriteRenderer weaponSr = visualsTransform.GetComponent<SpriteRenderer>();
+                        if (weaponSr != null)
+                        {
+                            visualsTransform.localScale = Vector3.one;
+                            weaponSr.drawMode = SpriteDrawMode.Sliced;
+                            weaponSr.size = boxCol.size;
+                            visualsTransform.localPosition = hitbox.transform.localPosition;
+                        }
+                    }
+                }
+            }
+
+            // Find the block shield GameObject using deep search to avoid hierarchy mismatch.
+            Transform shieldTrans = FindDeepChild(transform, "BlockShield");
+            if (shieldTrans != null)
+            {
+                blockShield = shieldTrans.gameObject;
+                blockShield.SetActive(false);
+            }
+            else
+            {
+                // Fallback: If not pre-configured in prefab, create it dynamically
+                Transform parent = visualsTransform != null ? visualsTransform.parent : transform;
+                GameObject shield = new GameObject("BlockShield");
+                shield.transform.SetParent(parent);
+                shield.transform.localScale = new Vector3(0.45f, 0.45f, 1f);
+                shield.transform.localPosition = new Vector3(0.2f, 0.2f, 0f);
+
+                SpriteRenderer shieldSr = shield.AddComponent<SpriteRenderer>();
+                SpriteRenderer charSr = GetComponentInChildren<SpriteRenderer>();
+                if (charSr != null)
+                {
+                    shieldSr.sprite = charSr.sprite;
+                    shieldSr.drawMode = SpriteDrawMode.Sliced;
+                }
+                shieldSr.color = new Color(0.3f, 0.8f, 1f, 0.55f);
+                shieldSr.sortingOrder = 1;
+
+                blockShield = shield;
+                blockShield.SetActive(false);
+            }
         }
 
         // 移動制御のオーバーライド: 特殊攻撃中はプレイヤーの移動入力を無視します
@@ -74,12 +130,36 @@ namespace FightingGameBase
             base.Move(direction);
         }
 
+        protected override void Update()
+        {
+            base.Update();
+            if (isDead)
+            {
+                if (blockShield != null && blockShield.activeSelf)
+                {
+                    blockShield.SetActive(false);
+                }
+                return;
+            }
+        }
+
+        private Transform FindDeepChild(Transform parent, string name)
+        {
+            foreach (Transform child in parent)
+            {
+                if (child.name == name) return child;
+                Transform result = FindDeepChild(child, name);
+                if (result != null) return result;
+            }
+            return null;
+        }
+
         // 通常攻撃（AttackNormal）
         public override void AttackNormal()
         {
-            if (isDead || isSwinging || isSpecialAttacking) return;
+            if (isDead || isSwinging || isSpecialAttacking || isDashingOrEvading || IsHurtLocked) return;
 
-            Debug.Log("ダガー・通常攻撃（素早い斬撃）発動！");
+            Debug.Log("ダガー・通常攻撃（予備動作あり斬撃）発動！");
             
             if (animator != null)
             {
@@ -87,30 +167,50 @@ namespace FightingGameBase
             }
 
             Hitbox hitbox = GetComponentInChildren<Hitbox>(true);
-            if (hitbox != null)
-            {
-                // 通常攻撃の判定時間。攻撃モーションに合わせて極めて短く（0.12秒）
-                StartCoroutine(ActivateHitboxTemporarily(hitbox.gameObject, 0.12f));
-            }
-
-            StartCoroutine(NormalAttackRoutine());
+            normalAttackCoroutine = StartCoroutine(NormalAttackRoutine(hitbox));
         }
 
-        private IEnumerator NormalAttackRoutine()
+        private IEnumerator NormalAttackRoutine(Hitbox hitbox)
         {
             isSwinging = true;
             float elapsed = 0f;
             Vector3 originalLocalPos = visualsTransform != null ? visualsTransform.localPosition : Vector3.zero;
 
-            // 1. 素早く突き刺す＆振る (0 -> thrustDistance, swingStartAngle -> swingEndAngle)
+            // 1. 予備動作（ウィンドアップ）: ダガーを後ろに引く (0.15秒)
+            float windupDuration = 0.15f;
+            while (elapsed < windupDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / windupDuration;
+                t = Mathf.Sin(t * Mathf.PI * 0.5f); // イージング
+
+                float angle = Mathf.Lerp(0f, -30f, t);
+                float posX = Mathf.Lerp(originalLocalPos.x, originalLocalPos.x - 0.15f, t);
+
+                if (visualsTransform != null)
+                {
+                    visualsTransform.localRotation = Quaternion.Euler(0, 0, angle);
+                    visualsTransform.localPosition = new Vector3(posX, visualsTransform.localPosition.y, visualsTransform.localPosition.z);
+                }
+                yield return null;
+            }
+
+            // 2. 攻撃判定の有効化 (予備動作の直後に発生！)
+            if (hitbox != null)
+            {
+                StartCoroutine(ActivateHitboxTemporarily(hitbox.gameObject, 0.12f));
+            }
+
+            // 3. 素早く突き刺す＆振る (0.12秒)
+            elapsed = 0f;
             while (elapsed < swingDuration)
             {
                 elapsed += Time.deltaTime;
                 float t = elapsed / swingDuration;
                 t = t * t; // イージング
 
-                float angle = Mathf.Lerp(swingStartAngle, swingEndAngle, t);
-                float posX = Mathf.Lerp(originalLocalPos.x, originalLocalPos.x + thrustDistance, t);
+                float angle = Mathf.Lerp(-30f, swingEndAngle, t);
+                float posX = Mathf.Lerp(originalLocalPos.x - 0.15f, originalLocalPos.x + thrustDistance, t);
 
                 if (visualsTransform != null)
                 {
@@ -128,7 +228,7 @@ namespace FightingGameBase
 
             yield return new WaitForSeconds(0.02f); // 突き刺し位置で極小ディレイ
 
-            // 2. 元に戻る
+            // 4. 元に戻る (0.15秒)
             elapsed = 0f;
             while (elapsed < recoverDuration)
             {
@@ -160,7 +260,7 @@ namespace FightingGameBase
         // 前に３歩進んで１歩ずつに斬撃を入れる（通常攻撃を３回するようなもの）
         public override void AttackSpecial()
         {
-            if (isDead || isSwinging || isSpecialAttacking) return;
+            if (isDead || isSwinging || isSpecialAttacking || isDashingOrEvading || IsHurtLocked) return;
 
             if (currentMana < 20f)
             {
@@ -170,7 +270,7 @@ namespace FightingGameBase
             currentMana -= 20f;
 
             Debug.Log("Dagger Special Attack triggered.");
-            StartCoroutine(SpecialStepSlashRoutine());
+            specialAttackCoroutine = StartCoroutine(SpecialStepSlashRoutine());
         }
 
         private IEnumerator SpecialStepSlashRoutine()
@@ -189,10 +289,32 @@ namespace FightingGameBase
             {
                 originalDamage = hitbox.damage;
                 hitbox.damage = specialSlashDamage; // 特殊攻撃用にダメージを設定
+                hitbox.isNormalAttack = false; // 特殊攻撃中は通常攻撃としてのマナ回復を無効化
             }
 
             Vector3 originalLocalPos = visualsTransform != null ? visualsTransform.localPosition : Vector3.zero;
 
+            // 1. 予備動作（ウィンドアップ・溜めフェーズ）: 武器を後ろに大きく引いて溜める (0.35秒)
+            float chargeDuration = 0.35f;
+            float elapsedCharge = 0f;
+            while (elapsedCharge < chargeDuration)
+            {
+                elapsedCharge += Time.deltaTime;
+                float t = elapsedCharge / chargeDuration;
+                t = Mathf.Sin(t * Mathf.PI * 0.5f); // イージング
+
+                float angle = Mathf.Lerp(0f, -45f, t);
+                float posX = Mathf.Lerp(originalLocalPos.x, originalLocalPos.x - 0.3f, t);
+
+                if (visualsTransform != null)
+                {
+                    visualsTransform.localRotation = Quaternion.Euler(0, 0, angle);
+                    visualsTransform.localPosition = new Vector3(posX, visualsTransform.localPosition.y, visualsTransform.localPosition.z);
+                }
+                yield return null;
+            }
+
+            // 2. 3連撃の開始！
             for (int step = 0; step < 3; step++)
             {
                 if (isDead) break;
@@ -262,6 +384,7 @@ namespace FightingGameBase
             if (hitbox != null)
             {
                 hitbox.damage = originalDamage; // ダメージを元に戻す
+                hitbox.isNormalAttack = true; // 通常攻撃判定に戻す
             }
 
             isSpecialAttacking = false;
@@ -289,6 +412,7 @@ namespace FightingGameBase
             if (isDead || isSwinging || isSpecialAttacking || isGuardBroken) return;
 
             isBlocking = true;
+            isBlockingState = true;
 
             // DeepWoken Block Spam Prevention: Check parry cooldown
             if (Time.time - lastParryTime < parryCooldown)
@@ -306,6 +430,36 @@ namespace FightingGameBase
 
             if (blockCoroutine != null) StopCoroutine(blockCoroutine);
             blockCoroutine = StartCoroutine(BlockEnterRoutine());
+
+            if (blockShield != null)
+            {
+                SpriteRenderer shieldSr = blockShield.GetComponent<SpriteRenderer>();
+                if (shieldSr == null)
+                {
+                    shieldSr = blockShield.AddComponent<SpriteRenderer>();
+                }
+
+                if (shieldSr.sprite == null)
+                {
+                    SpriteRenderer charSr = GetComponentInChildren<SpriteRenderer>();
+                    if (charSr != null)
+                    {
+                        shieldSr.sprite = charSr.sprite;
+                    }
+                }
+                
+                shieldSr.drawMode = SpriteDrawMode.Sliced;
+                shieldSr.size = new Vector2(0.8f, 2.0f); // Cover the front of the character (1x2 size)
+                // Vivid blue if parrying, dull blue if block-only (same as Taiken)
+                shieldSr.color = isParrying ? new Color(0.3f, 0.8f, 1f, 0.6f) : new Color(0.3f, 0.5f, 0.7f, 0.45f);
+                shieldSr.sortingOrder = 10; // Bring to absolute front
+
+                // Position shield right in front of the character
+                blockShield.transform.localPosition = new Vector3(0.7f, 0f, 0f);
+                blockShield.transform.localScale = Vector3.one;
+
+                blockShield.SetActive(true);
+            }
         }
 
         public override void StopBlock()
@@ -313,16 +467,54 @@ namespace FightingGameBase
             if (!isBlocking) return;
 
             isBlocking = false;
+            isBlockingState = false;
             isParrying = false;
             Debug.Log("ダガーブロック解除。");
 
             if (blockCoroutine != null) StopCoroutine(blockCoroutine);
             blockCoroutine = StartCoroutine(BlockExitRoutine());
+
+            if (blockShield != null)
+            {
+                blockShield.SetActive(false);
+            }
         }
 
-        public override void TakeDamage(int damage)
+        private void CancelAttacks()
         {
-            if (isDead) return;
+            isSwinging = false;
+            isSpecialAttacking = false;
+
+            if (normalAttackCoroutine != null)
+            {
+                StopCoroutine(normalAttackCoroutine);
+                normalAttackCoroutine = null;
+            }
+            if (specialAttackCoroutine != null)
+            {
+                StopCoroutine(specialAttackCoroutine);
+                specialAttackCoroutine = null;
+            }
+
+            Hitbox hitbox = GetComponentInChildren<Hitbox>(true);
+            if (hitbox != null)
+            {
+                hitbox.gameObject.SetActive(false);
+            }
+
+            // Restore weapon visual properties
+            if (visualsTransform != null)
+            {
+                visualsTransform.localRotation = Quaternion.identity;
+                visualsTransform.localPosition = new Vector3(0.5f, 0f, 0f);
+            }
+        }
+
+        public override void TakeDamage(int damage, Hitbox attackerHitbox = null)
+        {
+            if (isDead || isInvincible) return;
+
+            CancelAttacks();
 
             // Find opponent (attacker)
             CharacterBase opponent = null;
@@ -358,14 +550,22 @@ namespace FightingGameBase
                     // Reset parry cooldown immediately to reward player for successful parry!
                     lastParryTime = -10f;
 
+                    // Recover posture by the attack's damage as a reward
+                    currentPosture -= damage;
+                    if (currentPosture < 0f) currentPosture = 0f;
+
+                    // パリー成功報酬としてマナを少量(6f)回復する
+                    AddMana(6f);
+
                     StartCoroutine(ParrySuccessRoutine());
                 }
                 else
                 {
                     Debug.Log("ダガーブロック成功！ダメージを防いだ！");
                     
-                    // Accumulate posture based on damage
-                    currentPosture += damage * 1.5f;
+                    // Accumulate posture based on damage (using custom multiplier if hit by a specific hitbox)
+                    float postureMultiplier = attackerHitbox != null ? attackerHitbox.postureDamageMultiplier : 1.5f;
+                    currentPosture += damage * postureMultiplier;
 
                     if (currentPosture >= maxPosture)
                     {
@@ -384,15 +584,26 @@ namespace FightingGameBase
                 Debug.Log("Blocked from behind! Guard bypassed!");
             }
 
-            base.TakeDamage(damage);
+            base.TakeDamage(damage, attackerHitbox);
         }
 
         private IEnumerator GuardBreakRoutine()
         {
+            if (HUDManager.Instance != null)
+            {
+                HUDManager.Instance.TriggerHitStop(2); // Freeze frame for 2 frames
+            }
+
             isGuardBroken = true;
             isBlocking = false;
+            isBlockingState = false;
             isParrying = false;
             Debug.Log("!! DAGGER GUARD BREAK !!");
+
+            if (blockShield != null)
+            {
+                blockShield.SetActive(false);
+            }
 
             // Visually turn character red-orange
             SpriteRenderer bodySr = GetComponentInChildren<SpriteRenderer>();
@@ -468,6 +679,22 @@ namespace FightingGameBase
 
         private IEnumerator ParrySuccessRoutine()
         {
+            SpriteRenderer bodySr = GetComponentInChildren<SpriteRenderer>();
+            Color originalColor = bodySr != null ? bodySr.color : new Color(0.2f, 0.6f, 0.9f, 1f);
+            if (bodySr != null)
+            {
+                bodySr.color = Color.white; // 体を白くフラッシュ
+            }
+
+            if (blockShield != null)
+            {
+                SpriteRenderer shieldSr = blockShield.GetComponent<SpriteRenderer>();
+                if (shieldSr != null)
+                {
+                    shieldSr.color = new Color(1f, 1f, 1f, 0.9f); // シールドも白くフラッシュ
+                }
+            }
+
             float elapsed = 0f;
             float bounceDuration = 0.04f;
             while (elapsed < bounceDuration)
@@ -490,6 +717,20 @@ namespace FightingGameBase
                 if (visualsTransform != null)
                     visualsTransform.localRotation = Quaternion.Euler(0, 0, angle);
                 yield return null;
+            }
+
+            if (bodySr != null)
+            {
+                bodySr.color = originalColor; // 体の色を復元
+            }
+
+            if (blockShield != null)
+            {
+                SpriteRenderer shieldSr = blockShield.GetComponent<SpriteRenderer>();
+                if (shieldSr != null)
+                {
+                    shieldSr.color = isParrying ? new Color(0.3f, 0.8f, 1f, 0.6f) : new Color(0.3f, 0.5f, 0.7f, 0.45f);
+                }
             }
 
             elapsed = 0f;
