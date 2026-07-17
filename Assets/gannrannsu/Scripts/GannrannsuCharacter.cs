@@ -84,6 +84,21 @@ namespace FightingGameBase
         [Tooltip("レーザーの射程（ワールド単位）")]
         public float laserRange = 20f;
 
+        [Header("===== クールタイム設定 =====")]
+        [Tooltip("通常攻撃のクールタイム（秒）")]
+        public float normalAttackCooldown = 0.2f;
+
+        [Tooltip("特殊攻撃（砲撃）のクールタイム（秒）")]
+        public float specialAttackCooldown = 0.4f;
+
+        [Tooltip("竜撃砲のクールタイム（秒）")]
+        public float ultimateAttackCooldown = 2.0f;
+
+        // 各攻撃の残りクールタイム時間（秒）
+        public float normalAttackCooldownTimer { get; private set; } = 0f;
+        public float specialAttackCooldownTimer { get; private set; } = 0f;
+        public float ultimateAttackCooldownTimer { get; private set; } = 0f;
+
         // --- GUI用テクスチャとスタイル ---
         private Texture2D bgTex;
         private Texture2D fillTex;
@@ -199,6 +214,14 @@ namespace FightingGameBase
 
             // --- チャージゲージの自動蓄積 ---
             AddCharge(passiveChargeRate * Time.deltaTime);
+
+            // --- クールタイムタイマーの更新 ---
+            if (normalAttackCooldownTimer > 0f)
+                normalAttackCooldownTimer = Mathf.Max(0f, normalAttackCooldownTimer - Time.deltaTime);
+            if (specialAttackCooldownTimer > 0f)
+                specialAttackCooldownTimer = Mathf.Max(0f, specialAttackCooldownTimer - Time.deltaTime);
+            if (ultimateAttackCooldownTimer > 0f)
+                ultimateAttackCooldownTimer = Mathf.Max(0f, ultimateAttackCooldownTimer - Time.deltaTime);
         }
 
         // チャージを増減させる関数
@@ -294,6 +317,9 @@ namespace FightingGameBase
         public new void AttackNormal()
         {
             if (isDead) return;
+            if (normalAttackCooldownTimer > 0f) return; // クールタイム中なら発動しない
+
+            normalAttackCooldownTimer = normalAttackCooldown; // タイマー設定
 
             if (myAnimator != null) myAnimator.SetTrigger("AttackNormal");
             Debug.Log("ガンランス：突き攻撃！");
@@ -312,6 +338,9 @@ namespace FightingGameBase
         public new void AttackSpecial()
         {
             if (isDead) return;
+            if (specialAttackCooldownTimer > 0f) return; // クールタイム中なら発動しない
+
+            specialAttackCooldownTimer = specialAttackCooldown; // タイマー設定
 
             if (myAnimator != null) myAnimator.SetTrigger("AttackSpecial");
             Debug.Log("ガンランス：砲撃発射！！");
@@ -343,6 +372,9 @@ namespace FightingGameBase
         public new void AttackUltimate()
         {
             if (isDead) return;
+            if (ultimateAttackCooldownTimer > 0f) return; // クールタイム中なら発動しない
+
+            ultimateAttackCooldownTimer = ultimateAttackCooldown; // タイマー設定
 
             // 必殺技発動時にゲージを消費してゼロに戻す
             chargeGauge = 0f;
