@@ -119,6 +119,9 @@ MonoBehaviour:
   currentHP: 0
   isGrounded: 0
   isDead: 0
+  isStunned: 0
+  stunChargeTime: 10
+  stunChargeGauge: 0
 --- !u!114 &3474803532178161701
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -149,6 +152,7 @@ MonoBehaviour:
   jumpKey: 1
   normalAttackKey: 40
   specialAttackKey: 38
+  stunAttackKey: 17
   simultaneousPressWindow: 0.05
 --- !u!1 &5184327826282647491
 GameObject:
@@ -178,7 +182,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.6, y: 0.6, z: 1}
+  m_LocalScale: {x: 0.35, y: 0.35, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 9188732512432184573}
@@ -232,12 +236,12 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_MaskInteraction: 0
-  m_Sprite: {fileID: -1137498722916577873, guid: 658e0be10bc2de542b3cebdd55f0f309, type: 3}
+  m_Sprite: {fileID: 10905, guid: 0000000000000000f000000000000000, type: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
-  m_DrawMode: 0
-  m_Size: {x: 10.24, y: 10.24}
+  m_DrawMode: 1
+  m_Size: {x: 2.857143, y: 5.714286}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
@@ -254,9 +258,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 60550021ca634a349bdb2d33c11255da, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FightingGameBase.FloatingBehavior
-  amplitude: 0.15
-  frequency: 3
-  baseOffset: 0.6
+  amplitude: 0.1
+  frequency: 2
 --- !u!1 &6594839060296334831
 GameObject:
   m_ObjectHideFlags: 0
