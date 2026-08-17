@@ -74,6 +74,13 @@ namespace FightingGameBase
         [Tooltip("特殊攻撃（砲撃）が命中したときのチャージ増加量")]
         public float specialHitChargeGain = 20f;
 
+        [Header("===== 竜撃砲クールタイム設定 =====")]
+        [Tooltip("竜撃砲のクールタイム（秒）")]
+        public float ultimateAttackCooldown = 3.0f;
+
+        // 竜撃砲の残りクールタイム時間（秒）
+        public float ultimateAttackCooldownTimer { get; private set; } = 0f;
+
         [Header("===== 竜撃砲レーザーエフェクト設定 =====")]
         [Tooltip("レーザーが表示される時間（秒）")]
         public float laserDuration = 0.5f;
@@ -207,6 +214,12 @@ namespace FightingGameBase
 
             // --- チャージゲージの自動蓄積 ---
             AddCharge(passiveChargeRate * Time.deltaTime);
+
+            // --- クールタイムタイマーの更新 ---
+            if (ultimateAttackCooldownTimer > 0f)
+            {
+                ultimateAttackCooldownTimer = Mathf.Max(0f, ultimateAttackCooldownTimer - Time.deltaTime);
+            }
         }
 
         // チャージを増減させる関数
@@ -360,6 +373,9 @@ namespace FightingGameBase
 
             // 必殺技発動時にゲージを消費してゼロに戻す
             chargeGauge = 0f;
+
+            // クールタイムタイマーを設定
+            ultimateAttackCooldownTimer = ultimateAttackCooldown;
 
             if (myAnimator != null) myAnimator.SetTrigger("AttackUltimate");
             Debug.Log("ガンランス：竜撃砲発動！！！");
