@@ -17,8 +17,53 @@ namespace FightingGameBase
         [Tooltip("誰の攻撃判定か（1ならプレイヤー1。自分自身には当たらないようにするためです）")]
         public int ownerPlayerID = 1;
 
+        [Tooltip("ガードされた時の体幹値（Posture）蓄積倍率")]
+        public float postureDamageMultiplier = 1.5f;
+
+        [Tooltip("通常攻撃であるかどうか（当たった時のマナ回復判定に用います）")]
+        public bool isNormalAttack = true;
+
         [Tooltip("これが飛び道具（遠距離攻撃）かどうか")]
         public bool isProjectile = false;
+
+        [HideInInspector]
+        public CharacterBase owner; // CharacterBase（攻撃側の本体）への参照
+
+        // 攻撃が相手に当たったときに呼び出されるコールバック
+        public System.Action<Hurtbox, int> OnHitLanded;
+
+        // 1回の攻撃アクティブ期間中に、すでに攻撃が当たったキャラクターを記録するリスト
+        private System.Collections.Generic.List<CharacterBase> hitCharacters = new System.Collections.Generic.List<CharacterBase>();
+
+        private void OnEnable()
+        {
+            hitCharacters.Clear();
+            CheckOverlap();
+        }
+
+        private void OnDisable()
+        {
+            hitCharacters.Clear();
+        }
+
+        // 攻撃判定が有効化した瞬間に重なっている敵を即座に検出する処理
+        // （Unity物理エンジンのタイミングによってOnTriggerEnter2Dが発火しないバグを防ぎます）
+        public void CheckOverlap()
+        {
+            Collider2D col = GetComponent<Collider2D>();
+            if (col == null || !col.enabled) return;
+
+            ContactFilter2D filter = new ContactFilter2D();
+            filter.useTriggers = true;
+
+            System.Collections.Generic.List<Collider2D> results = new System.Collections.Generic.List<Collider2D>();
+            int count = col.Overlap(filter, results);
+
+            for (int i = 0; i < count; i++)
+            {
+                OnTriggerEnter2D(results[i]);
+            }
+        }
 
         // OnTriggerEnter2D は、この「攻撃判定」が「他の誰かの判定」に重なった瞬間に
         // Unityが自動的に呼び出してくれる便利なメソッド（機能）です！
@@ -28,14 +73,29 @@ namespace FightingGameBase
             Hurtbox hurtbox = other.GetComponent<Hurtbox>();
             
             // もし相手がやられ判定（Hurtbox）を持っていて、さらに「自分自身」ではない場合...
-            if (hurtbox != null && hurtbox.owner != null && hurtbox.owner.playerID != ownerPlayerID)
+            if (hurtbox != null && hurtbox.owner != null && (owner != null ? hurtbox.owner != owner : hurtbox.owner.playerID != ownerPlayerID))
             {
-                // 相手にダメージを与えます！
-                hurtbox.TakeDamage(this);
-                
-                // 【改造のヒント】
-                // もし「攻撃が当たったときに火花を出したい！」「ドカンという音を鳴らしたい！」
-                // という場合は、ここにそのプログラムを追加します！
+                // すでに今回の攻撃でダメージを与えていない場合のみダメージ処理を行う（多段ヒット防止と正確な1ヒットの保証）
+                if (!hitCharacters.Contains(hurtbox.owner))
+                {
+                    hitCharacters.Add(hurtbox.owner);
+
+                    // 相手にダメージを与えます！
+                    hurtbox.TakeDamage(damage, this);
+
+                    // 通常攻撃かつ攻撃主が存在する場合、攻撃主のマナを少量（10f）回復する
+                    if (isNormalAttack && owner != null)
+                    {
+                        owner.AddMana(10f);
+                    }
+
+                    // 攻撃が当たったことを通知します
+                    OnHitLanded?.Invoke(hurtbox, damage);
+
+                    // 【改造のヒント】
+                    // もし「攻撃が当たったときに火花を出したい！」「ドカンという音を鳴らしたい！」
+                    // という場合は、ここにそのプログラムを追加します！
+                }
             }
         }
 

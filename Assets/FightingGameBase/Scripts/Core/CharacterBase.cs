@@ -3,26 +3,30 @@ using System.Collections;
 
 namespace FightingGameBase
 {
-    // =================================================================================
-    // 【CharacterBase（キャラクターの基本システム）】
-    // このスクリプトはキャラクターの「体力」「移動」「ジャンプ」「攻撃」といった
-    // 根本的な仕組みをまとめたものです。
-    // =================================================================================
+    // Base class for all characters in the game.
     [RequireComponent(typeof(Rigidbody2D))]
     public class CharacterBase : MonoBehaviour
     {
-        [Header("キャラクター設定")]
-        [Tooltip("ステータス（体力やスピード）の設定データファイル")]
-        public CharacterStats stats; // CharacterStatsスクリプタブルオブジェクトをセットします
-        
-        [Tooltip("プレイヤー番号（1なら1P、2なら2P）")]
-        public int playerID = 1; 
+        [Header("Character Configurations")]
+        public CharacterStats stats;
+        public int playerID = 1;
 
-        [Header("現在の状態（ゲーム中に変化します）")]
-        public int currentHP;        // 今の体力
-        public bool isGrounded;      // 地面に足がついているか（trueならジャンプ可能）
-        public bool isDead;          // 倒れているか
-        public bool isStunned;       // スタン（行動不能）状態かどうか
+        [Header("Character Stats")]
+        public int maxHP = 100;
+        public int currentHP;
+        public bool isGrounded;
+        public bool isDead;
+        public bool isStunned = false;
+
+        [Header("Dash & Evade Configurations")]
+        public bool isInvincible = false;
+        public bool isDashingOrEvading = false;
+        
+        // 攻撃動作中か判定するための仮想プロパティ（派生先でオーバーライドされます）
+        public virtual bool IsAttacking => false;
+
+        [HideInInspector]
+        public float lastHurtTime = -10f;
 
         // --- スタンスキル用の内部変数 ---
         private bool hasUsedStun = false;       // スタンスキルを使ったかどうか（1試合に1回）
@@ -45,29 +49,60 @@ namespace FightingGameBase
         /// </summary>
         public bool HasUsedStun => hasUsedStun;
 
-        // --- プログラム内で使う部品（コンポーネント） ---
-        private Rigidbody2D rb;      // 物理エンジン（重力や移動を計算する機能）
-        private Animator animator;   // アニメーションを再生する機能
+        // 被ダメージ後、一定時間（0.25秒）通常攻撃・特殊攻撃を出せないようにするロック判定
+        public bool IsHurtLocked => Time.time - lastHurtTime < 0.25f;
 
-        void Start()
+        [Header("DeepWoken Posture & Mana Settings")]
+        public float maxPosture = 100f;
+        public float currentPosture = 0f;
+        public float postureRegenSpeed = 20f;
+        public float maxMana = 100f;
+        public float currentMana = 50f; // Starts with 50 Mana
+        public float manaRegenSpeed = 8f; // Mana recovery speed per second
+        public bool isBlockingState = false;
+
+        protected Rigidbody2D rb;
+        protected Animator animator;
+
+        protected virtual void Start()
         {
-            // 自分自身についている Rigidbody2D を取得します
             rb = GetComponent<Rigidbody2D>();
-            
-            // 子オブジェクト（Visualsなど）についている Animator を取得します
-            animator = GetComponentInChildren<Animator>(); 
-            
-            // もしステータス（CharacterStats）がセットされていれば、最初の体力を最大HPにします
+            rb.mass = 1000f; // Prevent characters from easily pushing each other like lightweight blocks
+            animator = GetComponentInChildren<Animator>();
+            if (animator != null && animator.runtimeAnimatorController == null)
+            {
+                animator = null;
+            }
+
             if (stats != null)
             {
-                currentHP = stats.maxHP;
+                maxHP = stats.maxHP * 2;
+            }
+            else
+            {
+                maxHP = maxHP * 2;
+            }
+            currentHP = maxHP;
+
+            // Auto-instantiate HUDManager if it's missing in the scene
+            if (FindAnyObjectByType<HUDManager>() == null)
+            {
+                GameObject hudGo = new GameObject("HUDManager");
+                hudGo.AddComponent<HUDManager>();
+            }
+
+            // Sync all child Hitboxes to this character's playerID to guarantee no owner ID mismatch issues
+            Hitbox[] hitboxes = GetComponentsInChildren<Hitbox>(true);
+            foreach (Hitbox h in hitboxes)
+            {
+                h.owner = this;
+                h.ownerPlayerID = playerID;
             }
         }
 
-        void Update()
+        protected virtual void Update()
         {
-            // すでに倒れているか、またはゲームが始まっていない場合は何もせず終了します
-            if (isDead || GameManager.Instance != null && !GameManager.Instance.IsPlaying) return;
+            if (isDead || (GameManager.Instance != null && !GameManager.Instance.IsPlaying)) return;
 
             // スタンチャージゲージを溜める（まだ使用済みでなく、満タンでない場合）
             if (!hasUsedStun && stunChargeGauge < 1f)
@@ -87,109 +122,90 @@ namespace FightingGameBase
                 SafeSetFloat("Speed", 0f);
             }
 
-            // --- 接地判定（地面にいるかどうか） ---
-            // Y軸の速度（上下の動き）が 0.1 より小さければ、地面にいるとみなします。
-            // （Unityの物理演算のブレを考慮して少し余裕を持たせています）
+            // Ground check (based on vertical velocity threshold)
             isGrounded = Mathf.Abs(rb.linearVelocity.y) < 0.1f;
-            
-            // アニメーターがあれば、地面にいるかどうかを伝えます（落下アニメーションなどのため）
+
             SafeSetBool("IsGrounded", isGrounded);
+
+            // (Natural posture recovery when not blocking has been disabled as requested)
+
+            // (Natural mana recovery when idle has been disabled as requested)
         }
 
-        // =========================================================
-        // アクション（移動・ジャンプ・攻撃など）
-        // ※ここは PlayerInputController（入力）から呼ばれます
-        // =========================================================
-
-        public void Move(float direction)
+        // 攻撃ヒット時やイベント時にマナを増加させるメソッド
+        public void AddMana(float amount)
         {
-            if (isDead || isStunned) return; // スタン中は移動できない
+            if (isDead) return;
+            currentMana += amount;
+            if (currentMana > maxMana) currentMana = maxMana;
+        }
 
-            // direction は -1(左) から 1(右) の値になります。
-            // statsがセットされていなければ、仮のスピード「5」を使います。
+        public virtual void Move(float direction)
+        {
+            if (isDead || isStunned) return;
+
             float speed = stats != null ? stats.moveSpeed : 5f;
-            
-            // 物理エンジンを使って、キャラクターを左右に動かします（Y軸の落下速度はそのまま）
             rb.linearVelocity = new Vector2(direction * speed, rb.linearVelocity.y);
 
-            // キャラクターの向き（画像）を反転する処理
+            // Flip sprite depending on direction
             if (direction != 0)
             {
-                // 右(1)か左(-1)に合わせて、スケール（大きさ）のXのプラスマイナスを切り替えます
                 transform.localScale = new Vector3(Mathf.Sign(direction), 1, 1);
             }
 
-            // アニメーターに「今どれくらいの速さで動いているか」を伝えます（歩きアニメーションのため）
             SafeSetFloat("Speed", Mathf.Abs(direction));
         }
 
         public void Jump()
         {
-            // 倒れているか、スタン中か、または空中にいるときはジャンプできません
-            if (isDead || isStunned || !isGrounded) return;
+            if (isDead || !isGrounded || isStunned) return;
 
-            // statsがセットされていなければ、仮のジャンプ力「12」を使います。
             float force = stats != null ? stats.jumpForce : 12f;
-            
-            // 上方向（Y軸）に力を加えてジャンプさせます
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, force);
-            
-            // ジャンプのアニメーションを再生するように伝えます
+
             SafeSetTrigger("Jump");
         }
 
-        // --- 攻撃処理 ---
-        
         public virtual void AttackNormal()
         {
-            if (isDead || isStunned) return; // スタン中は攻撃できない
-            
-            // 通常攻撃のアニメーションを再生
-            SafeSetTrigger("AttackNormal");
-            Debug.Log("通常攻撃発動！");
+            if (isDead || isStunned) return;
 
-            // 子オブジェクトからHitbox（攻撃判定）を探して、一時的にオン（有効）にします！
+            SafeSetTrigger("AttackNormal");
+            Debug.Log("Normal attack triggered.");
+
             Hitbox hitbox = GetComponentInChildren<Hitbox>(true);
             if (hitbox != null)
             {
-                // コルーチンという機能を使って、0.2秒間だけ判定を出します
                 StartCoroutine(ActivateHitboxTemporarily(hitbox.gameObject, 0.2f));
             }
         }
 
-        // 時間差で処理を行うための仕組み（コルーチン）です
-        private System.Collections.IEnumerator ActivateHitboxTemporarily(GameObject hitboxObj, float duration)
+        protected IEnumerator ActivateHitboxTemporarily(GameObject hitboxObj, float duration)
         {
-            hitboxObj.SetActive(true); // 攻撃判定を出す（赤い箱が現れる）
-            yield return new WaitForSeconds(duration); // 指定した時間（今回は0.2秒）だけ待つ
-            hitboxObj.SetActive(false); // 攻撃判定を消す
+            hitboxObj.SetActive(true);
+            yield return new WaitForSeconds(duration);
+            hitboxObj.SetActive(false);
         }
 
         public virtual void AttackSpecial()
         {
-            if (isDead || isStunned) return; // スタン中は攻撃できない
-            
-            // 特殊攻撃のアニメーションを再生
+            if (isDead || isStunned) return;
             SafeSetTrigger("AttackSpecial");
-            Debug.Log("特殊攻撃発動！");
+            Debug.Log("Special attack triggered.");
         }
 
         public virtual void AttackUltimate()
         {
-            if (isDead || isStunned) return; // スタン中は攻撃できない
-            
-            // 必殺技のアニメーションを再生
+            if (isDead || isStunned) return;
             SafeSetTrigger("AttackUltimate");
-            Debug.Log("必殺攻撃（同時押し）発動！！");
+            Debug.Log("Ultimate attack triggered.");
         }
-
-        // =========================================================
-        // ダメージとゲームオーバーの処理
-        // =========================================================
 
         public virtual void TakeDamage(int damage, Hitbox attackerHitbox = null)
         {
-            if (isDead) return;
+            if (isDead || isInvincible) return;
+
+            lastHurtTime = Time.time;
 
             // スタン中に攻撃を受けたら、スタンを解除する
             if (isStunned)
@@ -197,14 +213,17 @@ namespace FightingGameBase
                 RemoveStun();
             }
 
-            // ダメージの分だけ体力を減らします
             currentHP -= damage;
-            if (currentHP < 0) currentHP = 0; // 体力がマイナスにならないようにする
+            if (currentHP < 0) currentHP = 0;
 
-            // ダメージを受けたアニメーションを再生します
             SafeSetTrigger("Damage");
 
-            // 体力がゼロになったら倒れる処理（Die）へ進みます
+            // Register hit in HUD for damage popups, combos, and HP bars
+            if (HUDManager.Instance != null)
+            {
+                HUDManager.Instance.RegisterHit(playerID, damage, transform.position);
+            }
+
             if (currentHP == 0)
             {
                 Die();
@@ -213,16 +232,188 @@ namespace FightingGameBase
 
         private void Die()
         {
-            isDead = true; // 倒れたフラグをオンにする
-            
-            // 倒れるアニメーションを再生します
+            isDead = true;
+
             SafeSetBool("IsDead", true);
-            
-            // GameManager（試合を管理するシステム）に、自分が倒れたことを通知します
+
             if (GameManager.Instance != null)
             {
                 GameManager.Instance.OnCharacterDied(playerID);
             }
+        }
+
+        public virtual void StartBlock() { }
+        public virtual void StopBlock() { }
+
+        public virtual void Stun(float duration)
+        {
+            if (isDead) return;
+            StartCoroutine(StunRoutine(duration));
+        }
+
+        private IEnumerator StunRoutine(float duration)
+        {
+            isStunned = true;
+            SafeSetTrigger("Damage");
+            yield return new WaitForSeconds(duration);
+            isStunned = false;
+        }
+
+        protected virtual void LateUpdate()
+        {
+            PreventCharacterOverlap();
+        }
+
+        private void PreventCharacterOverlap()
+        {
+            if (isDead || rb == null || isDashingOrEvading) return;
+
+            // Find opponent
+            CharacterBase opponent = null;
+            CharacterBase[] allChars = FindObjectsByType<CharacterBase>(FindObjectsSortMode.None);
+            foreach (CharacterBase c in allChars)
+            {
+                if (c != this && !c.isDead)
+                {
+                    opponent = c;
+                    break;
+                }
+            }
+
+            if (opponent == null) return;
+
+            // Get distance
+            float dx = opponent.transform.position.x - transform.position.x;
+            float absDx = Mathf.Abs(dx);
+            float dy = opponent.transform.position.y - transform.position.y;
+            float absDy = Mathf.Abs(dy);
+
+            // Assume standard capsule collision width sum is ~0.9f.
+            // Only block horizontal movement if we are close vertically (not jumping over each other).
+            float minHorizontalDistance = 0.9f;
+            float minVerticalDistance = 1.6f;
+
+            if (absDx < minHorizontalDistance && absDy < minVerticalDistance)
+            {
+                Vector2 vel = rb.linearVelocity;
+
+                // Moving right towards opponent on the right -> stop
+                if (dx > 0 && vel.x > 0)
+                {
+                    vel.x = 0f;
+                    rb.linearVelocity = vel;
+                }
+                // Moving left towards opponent on the left -> stop
+                else if (dx < 0 && vel.x < 0)
+                {
+                    vel.x = 0f;
+                    rb.linearVelocity = vel;
+                }
+            }
+        }
+
+        public void TriggerDashOrEvade(float inputDir)
+        {
+            if (isDead || isStunned || isDashingOrEvading || IsAttacking) return;
+            StartCoroutine(DashOrEvadeRoutine(inputDir));
+        }
+
+        private IEnumerator DashOrEvadeRoutine(float inputDir)
+        {
+            isDashingOrEvading = true;
+            isInvincible = true;
+
+            // Opponent search
+            CharacterBase opponent = null;
+            CharacterBase[] allChars = FindObjectsByType<CharacterBase>(FindObjectsSortMode.None);
+            foreach (CharacterBase c in allChars)
+            {
+                if (c != this && !c.isDead)
+                {
+                    opponent = c;
+                    break;
+                }
+            }
+
+            Collider2D[] myCols = GetComponentsInChildren<Collider2D>();
+            Collider2D[] oppCols = opponent != null ? opponent.GetComponentsInChildren<Collider2D>() : null;
+
+            // Ignore collision with opponent
+            if (myCols != null && oppCols != null)
+            {
+                foreach (var cA in myCols)
+                {
+                    foreach (var cB in oppCols)
+                    {
+                        Physics2D.IgnoreCollision(cA, cB, true);
+                    }
+                }
+            }
+
+            // Find visuals transform (fallback to this transform if not found)
+            Transform visuals = transform.Find("Visuals");
+            if (visuals == null) visuals = transform;
+
+            SpriteRenderer sr = visuals.GetComponentInChildren<SpriteRenderer>();
+            Color originalColor = sr != null ? sr.color : Color.white;
+            Vector3 originalScale = visuals.localScale;
+
+            float faceDir = transform.localScale.x; // 1 = right, -1 = left
+            bool isDash = inputDir != 0f;
+            float dashDir = isDash ? Mathf.Sign(inputDir) : -faceDir; // Dash in input direction, Evade backward
+            float duration = isDash ? 0.18f : 0.15f; // ダッシュ距離を縮小 (duration: 0.22 -> 0.18, evade: 0.18 -> 0.15)
+            float speed = isDash ? 13f : 8f;         // ダッシュ速度を抑える (speed: 18 -> 13, evade: 10 -> 8)
+
+            // Apply visual cues
+            if (sr != null)
+            {
+                sr.color = new Color(originalColor.r, originalColor.g, originalColor.b, 0.45f); // Transparent ghosting effect
+            }
+
+            if (isDash)
+            {
+                // Dash squash-stretch scaling
+                visuals.localScale = new Vector3(originalScale.x * 1.3f, originalScale.y * 0.8f, originalScale.z);
+            }
+            else
+            {
+                // Evade tilt angle rotation
+                visuals.localRotation = Quaternion.Euler(0, 0, -dashDir * 15f);
+            }
+
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                if (isDead) break;
+                elapsed += Time.deltaTime;
+                rb.linearVelocity = new Vector2(dashDir * speed, rb.linearVelocity.y);
+                yield return null;
+            }
+
+            rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+
+            // Restore collisions
+            if (myCols != null && oppCols != null)
+            {
+                foreach (var cA in myCols)
+                {
+                    foreach (var cB in oppCols)
+                    {
+                        Physics2D.IgnoreCollision(cA, cB, false);
+                    }
+                }
+            }
+
+            // Restore visuals
+            if (sr != null)
+            {
+                sr.color = originalColor;
+            }
+            visuals.localScale = originalScale;
+            visuals.localRotation = Quaternion.identity;
+
+            isInvincible = false;
+            isDashingOrEvading = false;
         }
 
         // =========================================================
