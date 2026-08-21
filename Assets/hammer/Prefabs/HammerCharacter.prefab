@@ -129,6 +129,11 @@ MonoBehaviour:
   normalAttackCooldown: 0.5
   specialAttackCooldown: 1
   ultimateAttackCooldown: 3
+  maxChargeGauge: 100
+  chargeGauge: 0
+  passiveChargeRate: 3
+  normalHitChargeGain: 15
+  specialHitChargeGain: 25
   maxJumps: 2
 --- !u!114 &8825983452605871567
 MonoBehaviour:
@@ -395,7 +400,7 @@ Transform:
   m_GameObject: {fileID: 7460643209910007352}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 1.2, y: 0.3, z: 0}
+  m_LocalPosition: {x: 1.5, y: 0.3, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -445,7 +450,7 @@ BoxCollider2D:
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 1.4, y: 1}
+  m_Size: {x: 1.8, y: 1}
   m_EdgeRadius: 0
 --- !u!114 &1960437104531378129
 MonoBehaviour:
