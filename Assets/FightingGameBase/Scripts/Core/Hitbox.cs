@@ -23,8 +23,14 @@ namespace FightingGameBase
         [Tooltip("通常攻撃であるかどうか（当たった時のマナ回復判定に用います）")]
         public bool isNormalAttack = true;
 
+        [Tooltip("これが飛び道具（遠距離攻撃）かどうか")]
+        public bool isProjectile = false;
+
         [HideInInspector]
         public CharacterBase owner; // CharacterBase（攻撃側の本体）への参照
+
+        // 攻撃が相手に当たったときに呼び出されるコールバック
+        public System.Action<Hurtbox, int> OnHitLanded;
 
         // 1回の攻撃アクティブ期間中に、すでに攻撃が当たったキャラクターを記録するリスト
         private System.Collections.Generic.List<CharacterBase> hitCharacters = new System.Collections.Generic.List<CharacterBase>();
@@ -49,7 +55,7 @@ namespace FightingGameBase
 
             ContactFilter2D filter = new ContactFilter2D();
             filter.useTriggers = true;
-            
+
             System.Collections.Generic.List<Collider2D> results = new System.Collections.Generic.List<Collider2D>();
             int count = col.Overlap(filter, results);
 
@@ -73,7 +79,7 @@ namespace FightingGameBase
                 if (!hitCharacters.Contains(hurtbox.owner))
                 {
                     hitCharacters.Add(hurtbox.owner);
-                    
+
                     // 相手にダメージを与えます！
                     hurtbox.TakeDamage(damage, this);
 
@@ -82,7 +88,10 @@ namespace FightingGameBase
                     {
                         owner.AddMana(10f);
                     }
-                    
+
+                    // 攻撃が当たったことを通知します
+                    OnHitLanded?.Invoke(hurtbox, damage);
+
                     // 【改造のヒント】
                     // もし「攻撃が当たったときに火花を出したい！」「ドカンという音を鳴らしたい！」
                     // という場合は、ここにそのプログラムを追加します！
