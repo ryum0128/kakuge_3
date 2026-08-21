@@ -84,10 +84,7 @@ namespace FightingGameBase
                 {
                     rbRef.linearVelocity = new Vector2(0, rbRef.linearVelocity.y);
                 }
-                if (animator != null)
-                {
-                    animator.SetFloat("Speed", 0f);
-                }
+                SafeSetFloat("Speed", 0f);
             }
 
             // --- 接地判定（地面にいるかどうか） ---
@@ -96,10 +93,7 @@ namespace FightingGameBase
             isGrounded = Mathf.Abs(rb.linearVelocity.y) < 0.1f;
             
             // アニメーターがあれば、地面にいるかどうかを伝えます（落下アニメーションなどのため）
-            if (animator != null)
-            {
-                animator.SetBool("IsGrounded", isGrounded);
-            }
+            SafeSetBool("IsGrounded", isGrounded);
         }
 
         // =========================================================
@@ -126,10 +120,7 @@ namespace FightingGameBase
             }
 
             // アニメーターに「今どれくらいの速さで動いているか」を伝えます（歩きアニメーションのため）
-            if (animator != null)
-            {
-                animator.SetFloat("Speed", Mathf.Abs(direction));
-            }
+            SafeSetFloat("Speed", Mathf.Abs(direction));
         }
 
         public void Jump()
@@ -144,10 +135,7 @@ namespace FightingGameBase
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, force);
             
             // ジャンプのアニメーションを再生するように伝えます
-            if (animator != null)
-            {
-                animator.SetTrigger("Jump");
-            }
+            SafeSetTrigger("Jump");
         }
 
         // --- 攻撃処理 ---
@@ -157,7 +145,7 @@ namespace FightingGameBase
             if (isDead || isStunned) return; // スタン中は攻撃できない
             
             // 通常攻撃のアニメーションを再生
-            if (animator != null) animator.SetTrigger("AttackNormal");
+            SafeSetTrigger("AttackNormal");
             Debug.Log("通常攻撃発動！");
 
             // 子オブジェクトからHitbox（攻撃判定）を探して、一時的にオン（有効）にします！
@@ -182,7 +170,7 @@ namespace FightingGameBase
             if (isDead || isStunned) return; // スタン中は攻撃できない
             
             // 特殊攻撃のアニメーションを再生
-            if (animator != null) animator.SetTrigger("AttackSpecial");
+            SafeSetTrigger("AttackSpecial");
             Debug.Log("特殊攻撃発動！");
         }
 
@@ -191,7 +179,7 @@ namespace FightingGameBase
             if (isDead || isStunned) return; // スタン中は攻撃できない
             
             // 必殺技のアニメーションを再生
-            if (animator != null) animator.SetTrigger("AttackUltimate");
+            SafeSetTrigger("AttackUltimate");
             Debug.Log("必殺攻撃（同時押し）発動！！");
         }
 
@@ -214,10 +202,7 @@ namespace FightingGameBase
             if (currentHP < 0) currentHP = 0; // 体力がマイナスにならないようにする
 
             // ダメージを受けたアニメーションを再生します
-            if (animator != null)
-            {
-                animator.SetTrigger("Damage");
-            }
+            SafeSetTrigger("Damage");
 
             // 体力がゼロになったら倒れる処理（Die）へ進みます
             if (currentHP == 0)
@@ -231,10 +216,7 @@ namespace FightingGameBase
             isDead = true; // 倒れたフラグをオンにする
             
             // 倒れるアニメーションを再生します
-            if (animator != null)
-            {
-                animator.SetBool("IsDead", true);
-            }
+            SafeSetBool("IsDead", true);
             
             // GameManager（試合を管理するシステム）に、自分が倒れたことを通知します
             if (GameManager.Instance != null)
@@ -273,7 +255,7 @@ namespace FightingGameBase
             stunChargeGauge = 0f; // ゲージをリセット
 
             // スタンスキルのアニメーション（あれば再生）
-            if (animator != null) animator.SetTrigger("AttackStun");
+            SafeSetTrigger("AttackStun");
             Debug.Log("スタンスキル発動！ 敵を2秒間行動不能にする！");
 
             // 相手キャラクターを探してスタンを付与する
@@ -300,14 +282,11 @@ namespace FightingGameBase
             StopAllCoroutines();
 
             // アニメーターの状態をリセットする（攻撃モーション等を中断）
-            if (animator != null)
-            {
-                animator.ResetTrigger("AttackNormal");
-                animator.ResetTrigger("AttackSpecial");
-                animator.ResetTrigger("AttackUltimate");
-                animator.SetFloat("Speed", 0f);
-                animator.SetTrigger("Stunned"); // スタン用のアニメーション（あれば再生）
-            }
+            SafeResetTrigger("AttackNormal");
+            SafeResetTrigger("AttackSpecial");
+            SafeResetTrigger("AttackUltimate");
+            SafeSetFloat("Speed", 0f);
+            SafeSetTrigger("Stunned");
 
             // 移動を止める
             Rigidbody2D rbRef = GetComponent<Rigidbody2D>();
@@ -341,10 +320,7 @@ namespace FightingGameBase
             Debug.Log($"プレイヤー{playerID} のスタンが解除された！");
 
             // スタン解除のアニメーション処理
-            if (animator != null)
-            {
-                animator.ResetTrigger("Stunned");
-            }
+            SafeResetTrigger("Stunned");
         }
 
         /// <summary>
@@ -355,5 +331,51 @@ namespace FightingGameBase
             yield return new WaitForSeconds(duration);
             RemoveStun(); // 時間が来たらスタン解除
         }
+
+        // =========================================================
+        // Animator パラメーター安全制御ヘルパー
+        // =========================================================
+        private bool HasAnimatorParameter(string paramName)
+        {
+            if (animator == null || animator.runtimeAnimatorController == null) return false;
+            foreach (AnimatorControllerParameter param in animator.parameters)
+            {
+                if (param.name == paramName) return true;
+            }
+            return false;
+        }
+
+        private void SafeSetBool(string paramName, bool value)
+        {
+            if (HasAnimatorParameter(paramName))
+            {
+                animator.SetBool(paramName, value);
+            }
+        }
+
+        private void SafeSetFloat(string paramName, float value)
+        {
+            if (HasAnimatorParameter(paramName))
+            {
+                animator.SetFloat(paramName, value);
+            }
+        }
+
+        private void SafeSetTrigger(string paramName)
+        {
+            if (HasAnimatorParameter(paramName))
+            {
+                animator.SetTrigger(paramName);
+            }
+        }
+
+        private void SafeResetTrigger(string paramName)
+        {
+            if (HasAnimatorParameter(paramName))
+            {
+                animator.ResetTrigger(paramName);
+            }
+        }
     }
 }
+

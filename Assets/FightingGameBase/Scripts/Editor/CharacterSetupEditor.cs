@@ -94,10 +94,10 @@ namespace FightingGameBase.Editor
             {
                 sr = ground.AddComponent<SpriteRenderer>();
             }
-            // 白い四角形スプライトをセット
+            // 白い四角形スプライトをセット（Simpleモードでスケール設定してWarning回避）
             sr.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
-            sr.drawMode = SpriteDrawMode.Sliced;
-            sr.size = new Vector2(30f, 1f);
+            sr.drawMode = SpriteDrawMode.Simple;
+            ground.transform.localScale = new Vector3(30f, 1f, 1f);
             sr.color = new Color(0.3f, 0.3f, 0.3f); // 少し暗いグレーにして地面っぽくする
             
             Selection.activeGameObject = ground;
@@ -136,6 +136,7 @@ namespace FightingGameBase.Editor
             SpriteRenderer sr = visuals.AddComponent<SpriteRenderer>(); // 2D画像を表示するためのコンポーネント
             
             string spritePath = "Assets/ライトセーバー/LightsaberCharacterSprite.png";
+            EnsureFullRectSprite(spritePath);
             Sprite customSprite = null;
             if (System.IO.File.Exists(spritePath))
             {
@@ -152,9 +153,8 @@ namespace FightingGameBase.Editor
             {
                 // 見やすいように仮の画像（四角形）をセットし、当たり判定（1x2）と同じサイズにする
                 sr.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
-                sr.drawMode = SpriteDrawMode.Sliced;
-                // スケールが0.35なので、1x2にするためには逆算して大きくしておく
-                sr.size = new Vector2(1f / 0.35f, 2f / 0.35f);
+                sr.drawMode = SpriteDrawMode.Simple;
+                visuals.transform.localScale = new Vector3(0.35f, 0.7f, 1f);
                 hurtCollider.size = new Vector2(1f, 2f);
             }
             
@@ -239,17 +239,10 @@ namespace FightingGameBase.Editor
             SpriteRenderer sr = visuals.AddComponent<SpriteRenderer>(); // 2D画像を表示するためのコンポーネント
             
             string spritePath = "Assets/ライトセーバー/LightsaberCharacterSprite.png";
+            EnsureFullRectSprite(spritePath);
             Sprite customSprite = null;
             if (System.IO.File.Exists(spritePath))
             {
-                // TextureImporterの設定をSpriteに変更する
-                TextureImporter importer = AssetImporter.GetAtPath(spritePath) as TextureImporter;
-                if (importer != null && importer.textureType != TextureImporterType.Sprite)
-                {
-                    importer.textureType = TextureImporterType.Sprite;
-                    importer.spriteImportMode = SpriteImportMode.Single;
-                    importer.SaveAndReimport();
-                }
                 customSprite = AssetDatabase.LoadAssetAtPath<Sprite>(spritePath);
             }
 
@@ -263,13 +256,11 @@ namespace FightingGameBase.Editor
             {
                 // 見やすいように仮の画像（四角形）をセットし、当たり判定（1x2）と同じサイズにする
                 sr.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
-                sr.drawMode = SpriteDrawMode.Sliced;
-                // スケールが0.35なので、1x2にするためには逆算して大きくしておく
-                sr.size = new Vector2(1f / 0.35f, 2f / 0.35f);
+                sr.drawMode = SpriteDrawMode.Simple;
+                visuals.transform.localScale = new Vector3(0.35f, 0.7f, 1f);
                 hurtCollider.size = new Vector2(1f, 2f);
             }
             
-            // visuals.AddComponent<Animator>();       // スプライト1枚のみにするため、アニメーターは除外
             visuals.AddComponent<FloatingBehavior>(); // ふわふわと浮遊する挙動を追加！
 
             // 3. 攻撃判定（Hitbox）の階層 (リーチは普通、攻撃の発生も早い)
@@ -334,13 +325,7 @@ namespace FightingGameBase.Editor
             // カウンターモーション用スプライトを自動アサイン
             void AssignSprite(string path, System.Action<Sprite> assign)
             {
-                TextureImporter imp = AssetImporter.GetAtPath(path) as TextureImporter;
-                if (imp != null && imp.textureType != TextureImporterType.Sprite)
-                {
-                    imp.textureType = TextureImporterType.Sprite;
-                    imp.spriteImportMode = SpriteImportMode.Single;
-                    imp.SaveAndReimport();
-                }
+                EnsureFullRectSprite(path);
                 Sprite s = AssetDatabase.LoadAssetAtPath<Sprite>(path);
                 if (s != null) assign(s);
             }
@@ -358,6 +343,37 @@ namespace FightingGameBase.Editor
             
             Debug.Log($"【完了】ライトセーバーキャラクターをプレハブとして作成しました！\n場所: {prefabPath} に保存されています。");
         }
+
+        private static void EnsureFullRectSprite(string path)
+        {
+            if (System.IO.File.Exists(path))
+            {
+                TextureImporter imp = AssetImporter.GetAtPath(path) as TextureImporter;
+                if (imp != null)
+                {
+                    bool changed = false;
+                    if (imp.textureType != TextureImporterType.Sprite)
+                    {
+                        imp.textureType = TextureImporterType.Sprite;
+                        imp.spriteImportMode = SpriteImportMode.Single;
+                        changed = true;
+                    }
+                    TextureImporterSettings settings = new TextureImporterSettings();
+                    imp.ReadTextureSettings(settings);
+                    if (settings.spriteMeshType != SpriteMeshType.FullRect)
+                    {
+                        settings.spriteMeshType = SpriteMeshType.FullRect;
+                        imp.SetTextureSettings(settings);
+                        changed = true;
+                    }
+                    if (changed)
+                    {
+                        imp.SaveAndReimport();
+                    }
+                }
+            }
+        }
     }
 }
 #endif
+
