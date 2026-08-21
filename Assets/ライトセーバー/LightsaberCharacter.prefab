@@ -105,7 +105,7 @@ GameObject:
   - component: {fileID: 6478704678610596988}
   - component: {fileID: 7990396500539489036}
   - component: {fileID: 4519470831170101161}
-  - component: {fileID: 803588876402953476}
+  - component: {fileID: -4898565712772829709}
   m_Layer: 0
   m_Name: Visuals
   m_TagString: Untagged
@@ -123,7 +123,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.35, y: 0.35, z: 1}
+  m_LocalScale: {x: 0.35, y: 0.7, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 4758507900536977854}
@@ -181,8 +181,8 @@ SpriteRenderer:
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
-  m_DrawMode: 1
-  m_Size: {x: 2.857143, y: 5.714286}
+  m_DrawMode: 0
+  m_Size: {x: 0.16, y: 0.16}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
@@ -201,7 +201,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FightingGameBase.FloatingBehavior
   amplitude: 0.1
   frequency: 2
---- !u!95 &803588876402953476
+--- !u!95 &-4898565712772829709
 Animator:
   serializedVersion: 7
   m_ObjectHideFlags: 0

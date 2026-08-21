@@ -38,21 +38,23 @@ namespace FightingGameBase
         {
             base.AttackNormal(); // 本来の攻撃判定・SE発生処理
 
-            // 1. Animator（.animアニメーションクリップ）がセットされている場合はアニメーター再生
+            // 1. Animator（.animアニメーションクリップ）がセットされている場合はアニメーター優先で再生
             if (anim != null && anim.runtimeAnimatorController != null)
             {
                 anim.SetTrigger("AttackNormal");
             }
-
-            // 2. プログラム（コルーチン）による動的補間アニメーションも実行
-            Transform visuals = transform.Find("Visuals");
-            if (visuals != null)
+            else
             {
-                if (currentSwingCoroutine != null)
+                // 2. Animatorがセットされていない場合はプログラム（コルーチン）でスムーズに振り下ろしを表現
+                Transform visuals = transform.Find("Visuals");
+                if (visuals != null)
                 {
-                    StopCoroutine(currentSwingCoroutine);
+                    if (currentSwingCoroutine != null)
+                    {
+                        StopCoroutine(currentSwingCoroutine);
+                    }
+                    currentSwingCoroutine = StartCoroutine(OverheadSlashAnimation(visuals, 0.32f));
                 }
-                currentSwingCoroutine = StartCoroutine(OverheadSlashAnimation(visuals, 0.32f));
             }
         }
 
@@ -67,15 +69,17 @@ namespace FightingGameBase
             {
                 anim.SetTrigger("AttackSpecial");
             }
-
-            Transform visuals = transform.Find("Visuals");
-            if (visuals != null)
+            else
             {
-                if (currentSwingCoroutine != null)
+                Transform visuals = transform.Find("Visuals");
+                if (visuals != null)
                 {
-                    StopCoroutine(currentSwingCoroutine);
+                    if (currentSwingCoroutine != null)
+                    {
+                        StopCoroutine(currentSwingCoroutine);
+                    }
+                    currentSwingCoroutine = StartCoroutine(HeavySlamAnimation(visuals, 0.45f));
                 }
-                currentSwingCoroutine = StartCoroutine(HeavySlamAnimation(visuals, 0.45f));
             }
         }
 
@@ -90,15 +94,17 @@ namespace FightingGameBase
             {
                 anim.SetTrigger("AttackUltimate");
             }
-
-            Transform visuals = transform.Find("Visuals");
-            if (visuals != null)
+            else
             {
-                if (currentSwingCoroutine != null)
+                Transform visuals = transform.Find("Visuals");
+                if (visuals != null)
                 {
-                    StopCoroutine(currentSwingCoroutine);
+                    if (currentSwingCoroutine != null)
+                    {
+                        StopCoroutine(currentSwingCoroutine);
+                    }
+                    currentSwingCoroutine = StartCoroutine(TripleSlashAnimation(visuals, 0.6f));
                 }
-                currentSwingCoroutine = StartCoroutine(TripleSlashAnimation(visuals, 0.6f));
             }
         }
 

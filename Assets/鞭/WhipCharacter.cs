@@ -38,15 +38,17 @@ namespace FightingGameBase
             {
                 anim.SetTrigger("AttackNormal");
             }
-
-            Transform visuals = transform.Find("Visuals");
-            if (visuals != null)
+            else
             {
-                if (currentWhipCoroutine != null)
+                Transform visuals = transform.Find("Visuals");
+                if (visuals != null)
                 {
-                    StopCoroutine(currentWhipCoroutine);
+                    if (currentWhipCoroutine != null)
+                    {
+                        StopCoroutine(currentWhipCoroutine);
+                    }
+                    currentWhipCoroutine = StartCoroutine(WhipLashAnimation(visuals, 0.35f));
                 }
-                currentWhipCoroutine = StartCoroutine(WhipLashAnimation(visuals, 0.35f));
             }
         }
 
@@ -61,15 +63,17 @@ namespace FightingGameBase
             {
                 anim.SetTrigger("AttackSpecial");
             }
-
-            Transform visuals = transform.Find("Visuals");
-            if (visuals != null)
+            else
             {
-                if (currentWhipCoroutine != null)
+                Transform visuals = transform.Find("Visuals");
+                if (visuals != null)
                 {
-                    StopCoroutine(currentWhipCoroutine);
+                    if (currentWhipCoroutine != null)
+                    {
+                        StopCoroutine(currentWhipCoroutine);
+                    }
+                    currentWhipCoroutine = StartCoroutine(WhipOverheadSnapAnimation(visuals, 0.48f));
                 }
-                currentWhipCoroutine = StartCoroutine(WhipOverheadSnapAnimation(visuals, 0.48f));
             }
         }
 
@@ -84,15 +88,17 @@ namespace FightingGameBase
             {
                 anim.SetTrigger("AttackUltimate");
             }
-
-            Transform visuals = transform.Find("Visuals");
-            if (visuals != null)
+            else
             {
-                if (currentWhipCoroutine != null)
+                Transform visuals = transform.Find("Visuals");
+                if (visuals != null)
                 {
-                    StopCoroutine(currentWhipCoroutine);
+                    if (currentWhipCoroutine != null)
+                    {
+                        StopCoroutine(currentWhipCoroutine);
+                    }
+                    currentWhipCoroutine = StartCoroutine(WhipFlurryAnimation(visuals, 0.65f));
                 }
-                currentWhipCoroutine = StartCoroutine(WhipFlurryAnimation(visuals, 0.65f));
             }
         }
 
