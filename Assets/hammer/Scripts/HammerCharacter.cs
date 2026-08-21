@@ -71,11 +71,15 @@ namespace FightingGameBase
 
         private Rigidbody2D myRb;
         private Animator myAnimator;
+        private Transform visualsTransform;
+        private bool isProceduralAnimating = false;
+        private Coroutine activeAnimCoroutine;
 
         void Awake()
         {
             myRb = GetComponent<Rigidbody2D>();
             myAnimator = GetComponentInChildren<Animator>();
+            visualsTransform = transform.Find("Visuals");
         }
 
         void Start()
@@ -125,6 +129,8 @@ namespace FightingGameBase
                 specialAttackCooldownTimer = Mathf.Max(0f, specialAttackCooldownTimer - Time.deltaTime);
             if (ultimateAttackCooldownTimer > 0f)
                 ultimateAttackCooldownTimer = Mathf.Max(0f, ultimateAttackCooldownTimer - Time.deltaTime);
+
+            HandleBaseAnimations();
         }
 
         // 地面と衝突している間だけジャンプ回数をリセットします
@@ -192,6 +198,8 @@ namespace FightingGameBase
             if (myAnimator != null) myAnimator.SetTrigger("AttackNormal");
             Debug.Log("ハンマー：通常攻撃（横振り）！");
 
+            PlayAnimation(AnimateAttackNormal());
+
             // 子オブジェクトから特定の攻撃判定（HammerHitbox）を探して、一時的に有効化します
             Hitbox hitbox = GetHitboxByName("HammerHitbox");
             if (hitbox != null)
@@ -214,6 +222,8 @@ namespace FightingGameBase
 
             if (myAnimator != null) myAnimator.SetTrigger("AttackSpecial");
             Debug.Log("ハンマー：特殊攻撃（前後連続叩きつけ）！");
+
+            PlayAnimation(AnimateAttackSpecial());
 
             StartCoroutine(ExecuteDoubleSlam());
         }
@@ -270,6 +280,8 @@ namespace FightingGameBase
 
             if (myAnimator != null) myAnimator.SetTrigger("AttackUltimate");
             Debug.Log("ハンマー：必殺技（ギガスマッシュ）！！！");
+
+            PlayAnimation(AnimateAttackUltimate());
 
             // 前方に少し踏み込みながら叩きつけます
             float forwardDirection = Mathf.Sign(transform.localScale.x);
@@ -391,6 +403,266 @@ namespace FightingGameBase
 
             // テキスト表示
             GUI.Label(new Rect(x, y, width, height), text, textStyle);
+        }
+
+        // =========================================================
+        // 手動・手続き型アニメーションシステム (Procedural Animations)
+        // =========================================================
+        private void PlayAnimation(System.Collections.IEnumerator anim)
+        {
+            if (activeAnimCoroutine != null)
+            {
+                StopCoroutine(activeAnimCoroutine);
+            }
+            isProceduralAnimating = true;
+            activeAnimCoroutine = StartCoroutine(anim);
+        }
+
+        private void HandleBaseAnimations()
+        {
+            if (isProceduralAnimating || isDead || visualsTransform == null) return;
+
+            if (!isGrounded)
+            {
+                // 空中：少し後ろに傾く
+                visualsTransform.localRotation = Quaternion.Euler(0f, 0f, -15f);
+            }
+            else if (Mathf.Abs(myRb.linearVelocity.x) > 0.1f)
+            {
+                // 移動中：歩きに合わせて前後揺れ
+                float angle = Mathf.Sin(Time.time * 14f) * 8f - 5f;
+                visualsTransform.localRotation = Quaternion.Euler(0f, 0f, angle);
+            }
+            else
+            {
+                // アイドル：ゆっくり呼吸するような揺れ
+                float angle = Mathf.Sin(Time.time * 3f) * 3f;
+                visualsTransform.localRotation = Quaternion.Euler(0f, 0f, angle);
+            }
+        }
+
+        public new void TakeDamage(int damage)
+        {
+            if (isDead) return;
+            base.TakeDamage(damage);
+
+            if (currentHP <= 0)
+            {
+                PlayAnimation(AnimateDeath());
+            }
+            else
+            {
+                PlayAnimation(AnimateDamage());
+            }
+        }
+
+        private System.Collections.IEnumerator AnimateAttackNormal()
+        {
+            if (visualsTransform == null) yield break;
+            float duration = 0.3f;
+            float elapsed = 0f;
+
+            // 振りかぶり (0.08秒)
+            float windupDuration = 0.08f;
+            while (elapsed < windupDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / windupDuration;
+                float angle = Mathf.Lerp(0f, -35f, t);
+                visualsTransform.localRotation = Quaternion.Euler(0f, 0f, angle);
+                yield return null;
+            }
+
+            // 振り下ろし (0.08秒)
+            elapsed = 0f;
+            float swingDuration = 0.08f;
+            while (elapsed < swingDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / swingDuration;
+                float angle = Mathf.Lerp(-35f, 90f, t);
+                visualsTransform.localRotation = Quaternion.Euler(0f, 0f, angle);
+                yield return null;
+            }
+
+            // 残心と戻り (残り時間)
+            elapsed = 0f;
+            float returnDuration = duration - windupDuration - swingDuration;
+            while (elapsed < returnDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / returnDuration;
+                float angle = Mathf.Lerp(90f, 0f, t);
+                visualsTransform.localRotation = Quaternion.Euler(0f, 0f, angle);
+                yield return null;
+            }
+
+            visualsTransform.localRotation = Quaternion.identity;
+            isProceduralAnimating = false;
+        }
+
+        private System.Collections.IEnumerator AnimateAttackSpecial()
+        {
+            if (visualsTransform == null) yield break;
+            float elapsed = 0f;
+
+            // --- 1段目: 前方叩きつけ ---
+            // 振り上げ (0.08秒)
+            while (elapsed < 0.08f)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / 0.08f;
+                visualsTransform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Lerp(0f, 75f, t));
+                yield return null;
+            }
+
+            // 叩きつけ (0.05秒)
+            elapsed = 0f;
+            while (elapsed < 0.05f)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / 0.05f;
+                visualsTransform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Lerp(75f, -30f, t));
+                yield return null;
+            }
+
+            // インパクトの揺れと溜め (残り0.12秒)
+            elapsed = 0f;
+            while (elapsed < 0.12f)
+            {
+                elapsed += Time.deltaTime;
+                float shake = Mathf.Sin(elapsed * 60f) * 2f;
+                visualsTransform.localRotation = Quaternion.Euler(0f, 0f, -30f + shake);
+                yield return null;
+            }
+
+            // --- 2段目: 後方叩きつけ ---
+            // 振り上げ (0.08秒)
+            elapsed = 0f;
+            while (elapsed < 0.08f)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / 0.08f;
+                visualsTransform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Lerp(-30f, 80f, t));
+                yield return null;
+            }
+
+            // 後方へ叩きつけ (0.05秒)
+            elapsed = 0f;
+            while (elapsed < 0.05f)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / 0.05f;
+                visualsTransform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Lerp(80f, -145f, t));
+                yield return null;
+            }
+
+            // 後方インパクトの揺れと溜め (0.07秒)
+            elapsed = 0f;
+            while (elapsed < 0.07f)
+            {
+                elapsed += Time.deltaTime;
+                float shake = Mathf.Sin(elapsed * 60f) * 2f;
+                visualsTransform.localRotation = Quaternion.Euler(0f, 0f, -145f + shake);
+                yield return null;
+            }
+
+            // 戻り (0.05秒)
+            elapsed = 0f;
+            while (elapsed < 0.05f)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / 0.05f;
+                visualsTransform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Lerp(-145f, 0f, t));
+                yield return null;
+            }
+
+            visualsTransform.localRotation = Quaternion.identity;
+            isProceduralAnimating = false;
+        }
+
+        private System.Collections.IEnumerator AnimateAttackUltimate()
+        {
+            if (visualsTransform == null) yield break;
+            float duration = 0.6f;
+            float elapsed = 0f;
+
+            Vector3 originalScale = visualsTransform.localScale;
+            Vector3 targetScale = originalScale * 1.5f;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+
+                if (t < 0.2f)
+                {
+                    visualsTransform.localScale = Vector3.Lerp(originalScale, targetScale, t / 0.2f);
+                }
+                else if (t > 0.8f)
+                {
+                    visualsTransform.localScale = Vector3.Lerp(targetScale, originalScale, (t - 0.8f) / 0.2f);
+                }
+                else
+                {
+                    visualsTransform.localScale = targetScale;
+                }
+
+                float angle = -t * 720f; // 高速スピン
+                visualsTransform.localRotation = Quaternion.Euler(0f, 0f, angle);
+
+                yield return null;
+            }
+
+            visualsTransform.localScale = originalScale;
+            visualsTransform.localRotation = Quaternion.identity;
+            isProceduralAnimating = false;
+        }
+
+        private System.Collections.IEnumerator AnimateDamage()
+        {
+            if (visualsTransform == null) yield break;
+            float duration = 0.2f;
+            float elapsed = 0f;
+            Vector3 originalScale = visualsTransform.localScale;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+                
+                float angle = Mathf.Lerp(0f, -25f, Mathf.PingPong(t * 2f, 1f));
+                visualsTransform.localRotation = Quaternion.Euler(0f, 0f, angle);
+
+                float scaleFactor = Mathf.Lerp(1.0f, 0.85f, Mathf.PingPong(t * 2f, 1f));
+                visualsTransform.localScale = originalScale * scaleFactor;
+
+                yield return null;
+            }
+
+            visualsTransform.localScale = originalScale;
+            visualsTransform.localRotation = Quaternion.identity;
+            isProceduralAnimating = false;
+        }
+
+        private System.Collections.IEnumerator AnimateDeath()
+        {
+            if (visualsTransform == null) yield break;
+            float duration = 1.0f;
+            float elapsed = 0f;
+            Vector3 startPos = visualsTransform.localPosition;
+            Vector3 targetPos = startPos + new Vector3(-0.5f, -1.0f, 0f);
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+
+                visualsTransform.localPosition = Vector3.Lerp(startPos, targetPos, t);
+                visualsTransform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Lerp(0f, -90f, t));
+
+                yield return null;
+            }
         }
     }
 }
