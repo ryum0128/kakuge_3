@@ -650,6 +650,10 @@ PrefabInstance:
       propertyPath: currentHP
       value: 100
       objectReference: {fileID: 0}
+    - target: {fileID: 8661476088865405214, guid: 28d55132866e8dd46a723662da8a9882, type: 3}
+      propertyPath: spriteCounterAttack
+      value: 
+      objectReference: {fileID: 0}
     m_RemovedComponents:
     - {fileID: 7990396500539489036, guid: 28d55132866e8dd46a723662da8a9882, type: 3}
     m_RemovedGameObjects: []
@@ -721,11 +725,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6291275589380594502, guid: d2d80247fbcaf2b4a9671355e59cf33a, type: 3}
       propertyPath: m_Size.x
-      value: 4.42
+      value: 4.53
       objectReference: {fileID: 0}
     - target: {fileID: 6291275589380594502, guid: d2d80247fbcaf2b4a9671355e59cf33a, type: 3}
       propertyPath: m_Size.y
-      value: 3.64
+      value: 0.0001
       objectReference: {fileID: 0}
     - target: {fileID: 7925490552805823003, guid: d2d80247fbcaf2b4a9671355e59cf33a, type: 3}
       propertyPath: m_Name
