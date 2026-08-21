@@ -27,7 +27,6 @@ namespace FightingGameBase
         // 相手の攻撃（Hitbox）が当たったときに、相手から呼び出されるメソッドです
         public void TakeDamage(int damage, Hitbox attackerHitbox = null)
         {
-            // 持ち主（キャラクター本体）が存在していれば...
             if (owner != null)
             {
                 // 持ち主の TakeDamage（ダメージを受ける処理）を実行して、HPを減らします！

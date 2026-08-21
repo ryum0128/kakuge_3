@@ -21,6 +21,7 @@ namespace FightingGameBase
         public Key specialAttackKey = Key.K;    // 特殊攻撃
         public Key blockKey = Key.H;            // ブロック・パリー
         public Key dashKey = Key.L;             // ダッシュ・回避
+        public Key stunAttackKey = Key.C;       // スタンスキル（行動不能）
 
         [Header("設定")]
         [Tooltip("通常攻撃キーと特殊攻撃キーの同時押しと判定する猶予時間（秒）。0.05秒くらいがちょうどいいです")]
@@ -141,6 +142,12 @@ namespace FightingGameBase
             if (Keyboard.current[normalAttackKey].wasReleasedThisFrame || Keyboard.current[specialAttackKey].wasReleasedThisFrame)
             {
                 isUltimateTriggered = false;
+            }
+
+            // --- スタンスキル (C) ---
+            if (Keyboard.current[stunAttackKey].wasPressedThisFrame)
+            {
+                character.AttackStun();
             }
         }
 
