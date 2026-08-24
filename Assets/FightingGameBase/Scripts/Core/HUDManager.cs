@@ -69,6 +69,7 @@ namespace FightingGameBase
         private Sprite p2PostureGradient;
         private Sprite p1ManaGradient;
         private Sprite p2ManaGradient;
+        private Sprite knobSprite;
 
         void Awake()
         {
@@ -87,6 +88,13 @@ namespace FightingGameBase
         {
             FindPlayers();
             CreateHUD();
+
+            // Auto-instantiate StunGaugeUI if missing in the scene
+            if (FindAnyObjectByType<StunGaugeUI>() == null)
+            {
+                GameObject stunGo = new GameObject("StunGaugeUI");
+                stunGo.AddComponent<StunGaugeUI>();
+            }
         }
 
         void OnDestroy()
@@ -98,6 +106,7 @@ namespace FightingGameBase
             if (p2PostureGradient != null) { Destroy(p2PostureGradient.texture); Destroy(p2PostureGradient); }
             if (p1ManaGradient != null) { Destroy(p1ManaGradient.texture); Destroy(p1ManaGradient); }
             if (p2ManaGradient != null) { Destroy(p2ManaGradient.texture); Destroy(p2ManaGradient); }
+            if (knobSprite != null) { Destroy(knobSprite.texture); Destroy(knobSprite); }
         }
 
         void FindPlayers()
@@ -134,6 +143,47 @@ namespace FightingGameBase
                 catch (System.Exception) { }
             }
             return f;
+        }
+
+        private Sprite GetKnobSprite()
+        {
+            if (knobSprite == null)
+            {
+                knobSprite = CreateCircularSprite();
+            }
+            return knobSprite;
+        }
+
+        private Sprite CreateCircularSprite()
+        {
+            int size = 128;
+            Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            Color[] pixels = new Color[size * size];
+            float center = size / 2f;
+            float radius = size / 2f;
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dist = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(center, center));
+                    if (dist <= radius)
+                    {
+                        // Anti-aliased circle edge
+                        float alpha = Mathf.Clamp01(radius - dist);
+                        pixels[y * size + x] = new Color(1f, 1f, 1f, alpha);
+                    }
+                    else
+                    {
+                        pixels[y * size + x] = Color.clear;
+                    }
+                }
+            }
+
+            texture.SetPixels(pixels);
+            texture.Apply();
+
+            return Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
         }
 
         private Sprite CreateGradientSprite(Color leftColor, Color rightColor)
@@ -233,7 +283,7 @@ namespace FightingGameBase
 
             // Circular frame for timer
             Image timerFrame = timerPanel.AddComponent<Image>();
-            timerFrame.sprite = Resources.GetBuiltinResource<Sprite>("UI/Skin/Knob.psd");
+            timerFrame.sprite = GetKnobSprite();
             timerFrame.color = new Color(0.12f, 0.12f, 0.16f, 0.9f);
             
             // Thin border ring for timer circle
@@ -244,7 +294,7 @@ namespace FightingGameBase
             ringRect.anchorMax = Vector2.one;
             ringRect.sizeDelta = new Vector2(4, 4);
             Image ringImg = timerRing.AddComponent<Image>();
-            ringImg.sprite = Resources.GetBuiltinResource<Sprite>("UI/Skin/Knob.psd");
+            ringImg.sprite = GetKnobSprite();
             ringImg.color = new Color(0.7f, 0.7f, 0.75f, 0.8f);
             timerRing.transform.SetAsFirstSibling();
 

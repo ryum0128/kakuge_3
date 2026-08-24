@@ -42,7 +42,7 @@ namespace FightingGameBase
         /// <summary>
         /// スタンゲージが満タンかどうかを確認できるプロパティ
         /// </summary>
-        public bool IsStunReady => stunChargeGauge >= 1f && !hasUsedStun;
+        public bool IsStunReady => stunChargeGauge >= 1f;
 
         /// <summary>
         /// スタンスキルが使用済みかどうかを確認できるプロパティ
@@ -442,7 +442,6 @@ namespace FightingGameBase
                 return;
             }
 
-            hasUsedStun = true; // 使用済みにする
             stunChargeGauge = 0f; // ゲージをリセット
 
             // スタンスキルのアニメーション（あれば再生）
@@ -465,11 +464,18 @@ namespace FightingGameBase
         /// このキャラクターをスタン（行動不能）状態にします。
         /// 実行中のアクション（コルーチン）をすべて強制中断します。
         /// </summary>
+        public virtual void ResetActionStates()
+        {
+        }
+
         public void ApplyStun(float duration)
         {
             if (isDead || isStunned) return;
 
-            // 実行中のすべてのコルーチン（攻撃アニメーションなど）を強制停止する
+            // Reset subclasses specific states (isSwinging, isCharging, etc.)
+            ResetActionStates();
+
+            // 実行中のすべてのコルーチンE攻撁EニメーションなどEを強制停止する
             StopAllCoroutines();
 
             // アニメーターの状態をリセットする（攻撃モーション等を中断）

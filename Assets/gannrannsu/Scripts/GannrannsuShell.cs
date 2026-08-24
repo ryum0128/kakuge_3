@@ -46,6 +46,12 @@ namespace FightingGameBase
             transform.localScale = new Vector3(moveDirection, 1f, 1f);
 
             // 一定時間後に自動で消す（画面外に飛んでいっても安心！）
+            Hitbox hb = gameObject.AddComponent<Hitbox>();
+            hb.damage = damage;
+            hb.ownerPlayerID = ownerPlayerID;
+            hb.isProjectile = true;
+            hb.isNormalAttack = false;
+
             Destroy(gameObject, lifetime);
         }
 
@@ -59,7 +65,7 @@ namespace FightingGameBase
             if (hurtbox != null && hurtbox.owner != null && hurtbox.owner.playerID != ownerPlayerID)
             {
                 // ダメージを与えます！
-                hurtbox.TakeDamage(damage);
+                hurtbox.TakeDamage(damage, GetComponent<Hitbox>());
                 Debug.Log($"砲撃弾が命中！{damage}ダメージ！");
 
                 // コールバックを呼び出します

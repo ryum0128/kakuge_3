@@ -80,6 +80,12 @@ namespace FightingGameBase
             CreateTrail();
 
             // 7. 自動消滅タイマー
+            Hitbox hb = gameObject.AddComponent<Hitbox>();
+            hb.damage = damage;
+            hb.ownerPlayerID = ownerPlayerID;
+            hb.isProjectile = true;
+            hb.isNormalAttack = false;
+
             Destroy(gameObject, lifetime);
         }
 
@@ -154,7 +160,7 @@ namespace FightingGameBase
             if (hurtbox != null && hurtbox.owner != null && hurtbox.owner.playerID != ownerPlayerID)
             {
                 // 大ダメージを与える！
-                hurtbox.TakeDamage(damage);
+                hurtbox.TakeDamage(damage, GetComponent<Hitbox>());
                 Debug.Log($"【命中】竜撃砲が対戦相手に直撃！ {damage} ダメージ！");
 
                 // 爆発エフェクトをその場に展開

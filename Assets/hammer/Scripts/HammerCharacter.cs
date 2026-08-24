@@ -103,9 +103,26 @@ namespace FightingGameBase
             }
         }
 
+        public override void ResetActionStates()
+        {
+            base.ResetActionStates();
+            // Deactivate hammer hitboxes
+            Hitbox h1 = GetHitboxByName("HammerHitbox");
+            if (h1 != null) h1.gameObject.SetActive(false);
+            Hitbox h2 = GetHitboxByName("HammerSpecialHitbox");
+            if (h2 != null) h2.gameObject.SetActive(false);
+            Hitbox h3 = GetHitboxByName("HammerSpecialBackHitbox");
+            if (h3 != null) h3.gameObject.SetActive(false);
+            Hitbox h4 = GetHitboxByName("HammerUltimateHitbox");
+            if (h4 != null) h4.gameObject.SetActive(false);
+        }
+
         void Update()
         {
             if (isDead || GameManager.Instance != null && !GameManager.Instance.IsPlaying) return;
+
+            // Call base.Update to charge stun gauge
+            base.Update();
 
             // 接地判定
             isGrounded = Mathf.Abs(myRb.linearVelocity.y) < 0.1f;

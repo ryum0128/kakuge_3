@@ -14,6 +14,8 @@ namespace FightingGameBase
         public LineRenderer whipLineRenderer;
         
         private Coroutine currentWhipCoroutine;
+        private bool isSwinging = false;
+        public override bool IsAttacking => isSwinging;
         private TrailRenderer trailRenderer;
         private Animator anim;
 
@@ -112,9 +114,10 @@ namespace FightingGameBase
         /// </summary>
         private IEnumerator WhipLashAnimation(Transform visuals, float duration)
         {
+            isSwinging = true;
             Vector3 originalPos = Vector3.zero;
             Quaternion originalRot = Quaternion.identity;
-            float facing = transform.localScale.x < 0 ? -1f : 1f;
+            float facing = 1f;
 
             // 各フェーズのトランスフォーム設定
             // 巻き上げため
@@ -188,6 +191,7 @@ namespace FightingGameBase
 
             visuals.localRotation = originalRot;
             visuals.localPosition = originalPos;
+            isSwinging = false;
             currentWhipCoroutine = null;
         }
 
@@ -197,9 +201,10 @@ namespace FightingGameBase
         /// </summary>
         private IEnumerator WhipOverheadSnapAnimation(Transform visuals, float duration)
         {
+            isSwinging = true;
             Vector3 originalPos = Vector3.zero;
             Quaternion originalRot = Quaternion.identity;
-            float facing = transform.localScale.x < 0 ? -1f : 1f;
+            float facing = 1f;
 
             Quaternion highRot = Quaternion.Euler(0, 0, 50f * facing);
             Vector3 highPos = new Vector3(-0.3f * facing, 0.4f, 0f);
@@ -257,6 +262,7 @@ namespace FightingGameBase
 
             visuals.localRotation = originalRot;
             visuals.localPosition = originalPos;
+            isSwinging = false;
             currentWhipCoroutine = null;
         }
 
@@ -266,9 +272,10 @@ namespace FightingGameBase
         /// </summary>
         private IEnumerator WhipFlurryAnimation(Transform visuals, float duration)
         {
+            isSwinging = true;
             Vector3 originalPos = Vector3.zero;
             Quaternion originalRot = Quaternion.identity;
-            float facing = transform.localScale.x < 0 ? -1f : 1f;
+            float facing = 1f;
 
             float stepTime = duration / 3f;
             SetTrailActive(true);
@@ -300,6 +307,7 @@ namespace FightingGameBase
 
             visuals.localRotation = originalRot;
             visuals.localPosition = originalPos;
+            isSwinging = false;
             currentWhipCoroutine = null;
         }
 

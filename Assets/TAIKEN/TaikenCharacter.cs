@@ -501,6 +501,50 @@ namespace FightingGameBase
             }
         }
 
+        public override void ResetActionStates()
+        {
+            base.ResetActionStates();
+            isSwinging = false;
+            isSpecialSwinging = false;
+            isBlocking = false;
+            isParrying = false;
+            isBlockingState = false;
+            if (blockShield != null) blockShield.SetActive(false);
+
+            // Restore weapon visuals
+            if (visualsTransform != null)
+            {
+                visualsTransform.localRotation = Quaternion.identity;
+                visualsTransform.localPosition = normalWeaponPos;
+                visualsTransform.localScale = Vector3.one;
+
+                SpriteRenderer weaponSr = visualsTransform.GetComponent<SpriteRenderer>();
+                if (weaponSr != null)
+                {
+                    weaponSr.drawMode = SpriteDrawMode.Sliced;
+                    weaponSr.size = normalWeaponSize;
+                }
+            }
+
+            // Restore hitbox damage and sizes
+            Hitbox hitbox = GetComponentInChildren<Hitbox>(true);
+            if (hitbox != null)
+            {
+                int originalDamage = 10;
+                hitbox.damage = originalDamage;
+                hitbox.transform.localPosition = new Vector3(0.5f, 0f, 0f);
+                hitbox.postureDamageMultiplier = 1.5f;
+                hitbox.isNormalAttack = true;
+                hitbox.gameObject.SetActive(false);
+
+                BoxCollider2D col = hitbox.GetComponent<BoxCollider2D>();
+                if (col != null)
+                {
+                    col.size = new Vector2(1.0f, 1.0f);
+                }
+            }
+        }
+
         public override void TakeDamage(int damage, Hitbox attackerHitbox = null)
         {
             if (isDead || isInvincible) return;

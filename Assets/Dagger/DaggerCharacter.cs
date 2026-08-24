@@ -510,6 +510,13 @@ namespace FightingGameBase
             }
         }
 
+        public override void ResetActionStates()
+        {
+            base.ResetActionStates();
+            isSwinging = false;
+            isSpecialAttacking = false;
+        }
+
         public override void TakeDamage(int damage, Hitbox attackerHitbox = null)
         {
             if (isDead || isInvincible) return;
