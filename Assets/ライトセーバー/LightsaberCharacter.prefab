@@ -93,7 +93,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FightingGameBase.Hitbox
   damage: 15
   ownerPlayerID: 1
+  postureDamageMultiplier: 1.5
+  isNormalAttack: 1
   isProjectile: 0
+  owner: {fileID: 0}
 --- !u!1 &4800324924547317727
 GameObject:
   m_ObjectHideFlags: 0
@@ -293,7 +296,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FightingGameBase.Hitbox
   damage: 30
   ownerPlayerID: 1
+  postureDamageMultiplier: 1.5
+  isNormalAttack: 1
   isProjectile: 0
+  owner: {fileID: 0}
 --- !u!1 &7073232099250164688
 GameObject:
   m_ObjectHideFlags: 0
@@ -411,9 +417,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FightingGameBase.LightsaberCharacter
   stats: {fileID: 11400000, guid: e3d806bca45a5fa4bac626e7685c1bac, type: 2}
   playerID: 1
+  maxHP: 100
   currentHP: 0
   isGrounded: 0
   isDead: 0
+  isStunned: 0
+  isInvincible: 0
+  isDashingOrEvading: 0
+  lastHurtTime: -10
+  stunChargeTime: 10
+  stunChargeGauge: 0
+  maxPosture: 100
+  currentPosture: 0
+  postureRegenSpeed: 20
+  maxMana: 100
+  currentMana: 50
+  manaRegenSpeed: 8
+  isBlockingState: 0
   spriteNormal: {fileID: 0}
   spriteCounterStance: {fileID: 0}
   spriteCounterFlash: {fileID: 0}
@@ -447,6 +467,9 @@ MonoBehaviour:
   leftKey: 15
   rightKey: 18
   jumpKey: 1
-  normalAttackKey: 40
-  specialAttackKey: 38
+  normalAttackKey: 24
+  specialAttackKey: 25
+  blockKey: 22
+  dashKey: 26
+  stunAttackKey: 17
   simultaneousPressWindow: 0.05

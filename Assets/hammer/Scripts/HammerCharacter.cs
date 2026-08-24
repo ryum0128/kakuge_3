@@ -160,7 +160,7 @@ namespace FightingGameBase
         // =========================================================
         // ジャンプ処理（2段ジャンプ対応）
         // =========================================================
-        public new void Jump()
+        public override void Jump()
         {
             if (isDead) return;
 
@@ -188,7 +188,7 @@ namespace FightingGameBase
         // =========================================================
         // 通常攻撃: ハンマーの横振り
         // =========================================================
-        public new void AttackNormal()
+        public override void AttackNormal()
         {
             if (isDead) return;
             if (normalAttackCooldownTimer > 0f) return; // クールタイム中なら発動しない
@@ -213,7 +213,7 @@ namespace FightingGameBase
         // =========================================================
         // 特殊攻撃: ハンマーの叩きつけ
         // =========================================================
-        public new void AttackSpecial()
+        public override void AttackSpecial()
         {
             if (isDead) return;
             if (specialAttackCooldownTimer > 0f) return; // クールタイム中なら発動しない
@@ -268,7 +268,7 @@ namespace FightingGameBase
         // =========================================================
         // 必殺技: ギガスマッシュ！（同時押しで発動する大技）
         // =========================================================
-        public new void AttackUltimate()
+        public override void AttackUltimate()
         {
             if (isDead) return;
             if (ultimateAttackCooldownTimer > 0f) return; // クールタイム中なら発動しない
@@ -393,7 +393,22 @@ namespace FightingGameBase
             {
                 float flash = Mathf.PingPong(Time.time * 4f, 1f);
                 barColor = Color.Lerp(new Color(0.85f, 0.15f, 0.15f), new Color(1f, 0.85f, 0f), flash); // 赤とゴールドの点滅
-                text = "ギガスマッシュ READY! (K+L)";
+                
+                string keyLabel = "K+L";
+                var inputController = GetComponent<HammerInputController>();
+                if (inputController != null)
+                {
+                    keyLabel = $"{inputController.normalAttackKey}+{inputController.specialAttackKey}";
+                }
+                else
+                {
+                    var playerInput = GetComponent<PlayerInputController>();
+                    if (playerInput != null)
+                    {
+                        keyLabel = $"{playerInput.normalAttackKey}+{playerInput.specialAttackKey}";
+                    }
+                }
+                text = $"ギガスマッシュ READY! ({keyLabel})";
             }
             
             // ゲージ描画
@@ -441,10 +456,10 @@ namespace FightingGameBase
             }
         }
 
-        public new void TakeDamage(int damage)
+        public override void TakeDamage(int damage, Hitbox attackerHitbox = null)
         {
             if (isDead) return;
-            base.TakeDamage(damage);
+            base.TakeDamage(damage, attackerHitbox);
 
             if (currentHP <= 0)
             {

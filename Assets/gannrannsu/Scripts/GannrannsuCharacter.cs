@@ -112,7 +112,7 @@ namespace FightingGameBase
         }
 
         // 移動とジャンプの上書き（チャージ中は動けないようにする）
-        public new void Move(float direction)
+        public override void Move(float direction)
         {
             if (isDead) return;
 
@@ -126,7 +126,7 @@ namespace FightingGameBase
             base.Move(direction);
         }
 
-        public new void Jump()
+        public override void Jump()
         {
             if (isDead || isCharging) return;
             base.Jump();
@@ -296,7 +296,22 @@ namespace FightingGameBase
             {
                 float flash = Mathf.PingPong(Time.time * 4f, 1f);
                 barColor = Color.Lerp(new Color(1f, 0.3f, 0f), new Color(1f, 0.9f, 0f), flash);
-                text = "竜撃砲 READY! (Z+X)";
+                
+                string keyLabel = "K+L";
+                var inputController = GetComponent<GannrannsuInputController>();
+                if (inputController != null)
+                {
+                    keyLabel = $"{inputController.normalAttackKey}+{inputController.specialAttackKey}";
+                }
+                else
+                {
+                    var playerInput = GetComponent<PlayerInputController>();
+                    if (playerInput != null)
+                    {
+                        keyLabel = $"{playerInput.normalAttackKey}+{playerInput.specialAttackKey}";
+                    }
+                }
+                text = $"竜撃砲 READY! ({keyLabel})";
             }
             
             // ゲージ描画
@@ -312,7 +327,7 @@ namespace FightingGameBase
         // 通常攻撃: ランスの突き（お手本と同じ近距離攻撃）
         // ※ GannrannsuInputController から呼ばれます
         // =========================================================
-        public new void AttackNormal()
+        public override void AttackNormal()
         {
             if (isDead || isAttacking) return;
 
@@ -333,7 +348,7 @@ namespace FightingGameBase
         // =========================================================
         // 特殊攻撃: 砲撃弾を飛ばす！（遠距離攻撃）
         // =========================================================
-        public new void AttackSpecial()
+        public override void AttackSpecial()
         {
             if (isDead || isAttacking) return;
 
@@ -367,7 +382,7 @@ namespace FightingGameBase
         // =========================================================
         // 必殺技: 竜撃砲！（同時押しで発動する大技）
         // =========================================================
-        public new void AttackUltimate()
+        public override void AttackUltimate()
         {
             if (isDead || isAttacking) return;
 
@@ -405,7 +420,7 @@ namespace FightingGameBase
         // =========================================================
         // ダメージを受けた時の処理（攻撃キャンセルの追加）
         // =========================================================
-        public new void TakeDamage(int damage)
+        public override void TakeDamage(int damage, Hitbox attackerHitbox = null)
         {
             if (isDead) return;
 
@@ -413,7 +428,7 @@ namespace FightingGameBase
             isAttacking = false;
             StopAllCoroutines();
 
-            base.TakeDamage(damage);
+            base.TakeDamage(damage, attackerHitbox);
         }
 
 
