@@ -108,14 +108,14 @@ namespace FightingGameBase.Editor
             weapon.transform.SetParent(visuals.transform);
             weapon.transform.localScale = Vector3.one;
             // 通常攻撃判定（PunchHitbox）と完全に同じ位置に配置
-            weapon.transform.localPosition = new Vector3(0.4f, 0.5f, 0f);
+            weapon.transform.localPosition = new Vector3(0.7f, 0.5f, 0f);
 
             SpriteRenderer weaponSr = weapon.AddComponent<SpriteRenderer>();
             weaponSr.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
             weaponSr.drawMode = SpriteDrawMode.Sliced; // Slicedモードを使用して正確なサイズを設定
-            weaponSr.size = new Vector2(0.8f, 0.5f); // 当たり判定（PunchHitboxのBoxCollider2D）と同じサイズに設定
+            weaponSr.size = new Vector2(1.4f, 0.6f); // 当たり判定（PunchHitboxのBoxCollider2D）と同じサイズに設定
             weaponSr.color = new Color(0.7f, 0.7f, 0.7f, 1f); // 少しグレーに設定
-            weaponSr.sortingOrder = 1; // キャラクターの手前に表示
+            weaponSr.sortingOrder = 5; // キャラクターの手前に表示
 
             visuals.AddComponent<Animator>();
 
@@ -125,12 +125,11 @@ namespace FightingGameBase.Editor
             // 4. 攻撃判定（Hitbox）の階層
             GameObject hitboxObj = new GameObject("PunchHitbox");
             hitboxObj.transform.SetParent(root.transform);
-            // サイズ縮小に伴い、攻撃判定のサイズと位置も適切にスケールダウン
-            hitboxObj.transform.localPosition = new Vector3(0.4f, 0.5f, 0f); 
+            hitboxObj.transform.localPosition = new Vector3(0.7f, 0.5f, 0f); 
             
             BoxCollider2D hitCollider = hitboxObj.AddComponent<BoxCollider2D>();
             hitCollider.isTrigger = true;
-            hitCollider.size = new Vector2(0.8f, 0.5f);
+            hitCollider.size = new Vector2(1.4f, 0.6f);
 
             Hitbox hitbox = hitboxObj.AddComponent<Hitbox>();
             hitbox.damage = 8; // ダガーなので一撃は軽めの8ダメージ（スピードで勝負）

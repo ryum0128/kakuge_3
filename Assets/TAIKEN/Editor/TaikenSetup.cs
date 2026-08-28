@@ -190,6 +190,49 @@ namespace FightingGameBase.Editor
 
             Debug.Log($"【サンドバック化完了】{selected.name} を不死身 ＆ 自動通常攻撃を行うAIに設定しました！");
         }
+
+        [MenuItem("FightingGame/選択したオブジェクトに対戦CPU(AI)をアタッチする")]
+        public static void MakeSelectedVersusCPU()
+        {
+            GameObject selected = Selection.activeGameObject;
+            if (selected == null)
+            {
+                Debug.LogError("オブジェクトを選択してください。");
+                return;
+            }
+
+            CharacterBase character = selected.GetComponent<CharacterBase>();
+            if (character == null)
+            {
+                Debug.LogError("CharacterBaseがアタッチされたオブジェクトを選択してください。");
+                return;
+            }
+
+            // Remove PlayerInputController to prevent player control input conflicts
+            PlayerInputController input = selected.GetComponent<PlayerInputController>();
+            if (input != null)
+            {
+                Object.DestroyImmediate(input);
+            }
+
+            // Remove SandbagAI if attached
+            SandbagAI sandbag = selected.GetComponent<SandbagAI>();
+            if (sandbag != null)
+            {
+                Object.DestroyImmediate(sandbag);
+            }
+
+            // Attach VersusCPUAI
+            VersusCPUAI cpu = selected.GetComponent<VersusCPUAI>();
+            if (cpu == null)
+            {
+                cpu = selected.AddComponent<VersusCPUAI>();
+            }
+
+            character.playerID = 2;
+
+            Debug.Log($"【対戦CPU化完了】{selected.name} に対戦型CPU(AI)をセットアップしました！");
+        }
     }
 }
 #endif

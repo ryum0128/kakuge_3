@@ -72,10 +72,11 @@ namespace FightingGameBase
             // ぶつかった相手（other）から、やられ判定（Hurtbox）のスクリプトを探します
             Hurtbox hurtbox = other.GetComponent<Hurtbox>();
             
-            // もし相手がやられ判定（Hurtbox）を持っていて、さらに「自分自身」ではない場合...
-            if (hurtbox != null && hurtbox.owner != null && (owner != null ? hurtbox.owner != owner : hurtbox.owner.playerID != ownerPlayerID))
+            if (owner == null) owner = GetComponentInParent<CharacterBase>();
+            if (owner != null) ownerPlayerID = owner.playerID;
+
+            if (hurtbox != null && hurtbox.owner != null && hurtbox.owner != owner && hurtbox.owner.playerID != ownerPlayerID)
             {
-                // すでに今回の攻撃でダメージを与えていない場合のみダメージ処理を行う（多段ヒット防止と正確な1ヒットの保証）
                 if (!hitCharacters.Contains(hurtbox.owner))
                 {
                     hitCharacters.Add(hurtbox.owner);

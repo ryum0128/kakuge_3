@@ -42,6 +42,9 @@ namespace FightingGameBase
 
         void Start()
         {
+            // 透明なステージ壁を生成・確認
+            EnsureStageBoundaries();
+
             // HUDManagerを動的に生成して動作させる
             if (FindAnyObjectByType<HUDManager>() == null)
             {
@@ -52,6 +55,27 @@ namespace FightingGameBase
             // 実際はここで「Round 1... Fight!」などのUI演出を行いますが、
             // 今はテスト用なのですぐに試合を開始します！
             StartBattle();
+        }
+
+        private void EnsureStageBoundaries()
+        {
+            float limitX = 12.2f;
+
+            if (GameObject.Find("Left_Invisible_Wall") == null)
+            {
+                GameObject leftWall = new GameObject("Left_Invisible_Wall");
+                leftWall.transform.position = new Vector3(-limitX, 2f, 0f);
+                BoxCollider2D col = leftWall.AddComponent<BoxCollider2D>();
+                col.size = new Vector2(1f, 25f);
+            }
+
+            if (GameObject.Find("Right_Invisible_Wall") == null)
+            {
+                GameObject rightWall = new GameObject("Right_Invisible_Wall");
+                rightWall.transform.position = new Vector3(limitX, 2f, 0f);
+                BoxCollider2D col = rightWall.AddComponent<BoxCollider2D>();
+                col.size = new Vector2(1f, 25f);
+            }
         }
 
         // 試合を開始するメソッド

@@ -40,72 +40,122 @@ namespace FightingGameBase
         private float lastParryTime = -10f;
         private float parryCooldown = 0.35f;
 
+        private static Sprite defaultSquareSprite;
+        private static Sprite defaultCircleSprite;
+
+        private static Sprite GetDefaultSquareSprite()
+        {
+            if (defaultSquareSprite != null) return defaultSquareSprite;
+            Texture2D tex = new Texture2D(32, 32, TextureFormat.RGBA32, false);
+            Color[] colors = new Color[32 * 32];
+            for (int i = 0; i < colors.Length; i++) colors[i] = Color.white;
+            tex.SetPixels(colors);
+            tex.Apply();
+            defaultSquareSprite = Sprite.Create(tex, new Rect(0, 0, 32, 32), new Vector2(0.5f, 0.5f));
+            return defaultSquareSprite;
+        }
+
+        private static Sprite GetDefaultCircleSprite()
+        {
+            if (defaultCircleSprite != null) return defaultCircleSprite;
+            int size = 64;
+            Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            Color[] colors = new Color[size * size];
+            float center = (size - 1) / 2f;
+            float radius = size / 2f - 1f;
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = x - center;
+                    float dy = y - center;
+                    float dist = Mathf.Sqrt(dx * dx + dy * dy);
+                    float alpha = Mathf.Clamp01(radius + 1f - dist);
+                    colors[y * size + x] = new Color(1f, 1f, 1f, alpha);
+                }
+            }
+            tex.SetPixels(colors);
+            tex.Apply();
+
+            defaultCircleSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
+            return defaultCircleSprite;
+        }
+
         protected override void Start()
         {
             base.Start();
 
-            // Locate the weapon visual object (Visuals/Weapon) for swing rotations.
-            visualsTransform = transform.Find("Visuals/Weapon");
-            if (visualsTransform == null)
+            // Locate or auto-create the weapon visual object (Visuals/Weapon) for swing rotations.
+            Transform visualsRoot = transform.Find("Visuals");
+            if (visualsRoot == null)
             {
-                HoverEffect hover = GetComponentInChildren<HoverEffect>(true);
-                if (hover != null)
-                {
-                    visualsTransform = hover.transform;
-                }
-                else
-                {
-                    visualsTransform = transform.Find("Visuals");
-                }
+                GameObject visObj = new GameObject("Visuals");
+                visObj.transform.SetParent(transform, false);
+                visualsRoot = visObj.transform;
             }
 
+            visualsTransform = visualsRoot.Find("Weapon");
             if (visualsTransform == null)
             {
-                Debug.LogError($"[TaikenCharacter] 'Visuals' or 'HoverEffect' not found on {gameObject.name}");
+                GameObject weaponObj = new GameObject("Weapon");
+                weaponObj.transform.SetParent(visualsRoot, false);
+                weaponObj.transform.localPosition = normalWeaponPos;
+                weaponObj.transform.localScale = Vector3.one;
+
+                SpriteRenderer weaponSr = weaponObj.AddComponent<SpriteRenderer>();
+                weaponSr.sprite = GetDefaultSquareSprite();
+                weaponSr.color = new Color(0.75f, 0.78f, 0.85f, 1f); // Metallic silver
+                weaponSr.sortingOrder = 5;
+                visualsTransform = weaponObj.transform;
             }
             else
             {
-                // Forcibly apply correct normal size and position at start using Sliced Sprite.size
                 visualsTransform.localPosition = normalWeaponPos;
-                visualsTransform.localScale = Vector3.one; // Keep scale at 1.0
-
                 SpriteRenderer weaponSr = visualsTransform.GetComponent<SpriteRenderer>();
-                if (weaponSr != null)
+                if (weaponSr == null)
                 {
-                    weaponSr.drawMode = SpriteDrawMode.Sliced;
-                    weaponSr.size = normalWeaponSize;
+                    weaponSr = visualsTransform.gameObject.AddComponent<SpriteRenderer>();
                 }
+                if (weaponSr.sprite == null)
+                {
+                    weaponSr.sprite = GetDefaultSquareSprite();
+                    weaponSr.color = new Color(0.75f, 0.78f, 0.85f, 1f);
+                }
+                weaponSr.sortingOrder = 5;
             }
 
-            // Find the block shield GameObject using deep search to avoid hierarchy mismatch.
+            // Find or auto-create the block shield GameObject
             Transform shieldTrans = FindDeepChild(transform, "BlockShield");
             if (shieldTrans != null)
             {
                 blockShield = shieldTrans.gameObject;
-                blockShield.SetActive(false);
             }
             else
             {
-                // Fallback: If not pre-configured in prefab, create it dynamically using character's sprite.
-                Transform parent = visualsTransform != null ? visualsTransform.parent : transform;
                 GameObject shield = new GameObject("BlockShield");
-                shield.transform.SetParent(parent);
-                shield.transform.localScale = new Vector3(0.45f, 0.45f, 1f);
+                shield.transform.SetParent(visualsRoot, false);
                 shield.transform.localPosition = new Vector3(0.2f, 0.2f, 0f);
 
                 SpriteRenderer shieldSr = shield.AddComponent<SpriteRenderer>();
-                SpriteRenderer charSr = GetComponentInChildren<SpriteRenderer>();
-                if (charSr != null)
-                {
-                    shieldSr.sprite = charSr.sprite;
-                    shieldSr.drawMode = SpriteDrawMode.Sliced;
-                }
-                shieldSr.color = new Color(0.3f, 0.8f, 1f, 0.55f);
-                shieldSr.sortingOrder = 1;
+                shieldSr.sprite = GetDefaultCircleSprite();
+                shieldSr.color = new Color(0.3f, 0.8f, 1f, 0.6f);
+                shieldSr.sortingOrder = 10;
 
                 blockShield = shield;
-                blockShield.SetActive(false);
             }
+
+            SpriteRenderer sSr = blockShield.GetComponent<SpriteRenderer>();
+            if (sSr == null)
+            {
+                sSr = blockShield.AddComponent<SpriteRenderer>();
+            }
+            if (sSr.sprite == null)
+            {
+                sSr.sprite = GetDefaultCircleSprite();
+            }
+            sSr.sortingOrder = 10;
+            blockShield.SetActive(false);
         }
 
         private Transform FindDeepChild(Transform parent, string name)
@@ -134,7 +184,8 @@ namespace FightingGameBase
 
         public override void Move(float direction)
         {
-            if (isSpecialSwinging || isGuardBroken)
+            // 特殊攻撃中（スペシャル攻撃中）またはガードブレイク・スタン中のみ移動を強制停止する（通常攻撃中は移動可能）
+            if (isSpecialSwinging || isGuardBroken || isDead || isStunned)
             {
                 if (rb != null)
                 {
@@ -142,7 +193,14 @@ namespace FightingGameBase
                 }
                 return;
             }
+
             base.Move(direction);
+        }
+
+        public override void Stun(float duration)
+        {
+            CancelAttacks();
+            base.Stun(duration);
         }
 
         // Override AttackNormal for Taiken custom swing.
@@ -165,31 +223,46 @@ namespace FightingGameBase
         {
             isSwinging = true;
             Debug.Log("Taiken animation: windup start.");
+
+            Vector3 handPivot = new Vector3(0.2f, 0.2f, 0f);
+            Vector3 weaponOffset = normalWeaponPos - handPivot;
+
+            SpriteRenderer weaponSr = visualsTransform != null ? visualsTransform.GetComponent<SpriteRenderer>() : null;
+            Color origColor = weaponSr != null ? weaponSr.color : Color.white;
+
             float elapsed = 0f;
 
-            // 1. 予備動作（ウィンドアップ）: 武器を振りかぶる (0.20秒)
-            float windupDuration = 0.20f;
+            // 1. 予備動作（ウィンドアップ）: 武器を肩上に高く振りかぶる (0.18秒)
+            float windupDuration = 0.18f;
             while (elapsed < windupDuration)
             {
                 elapsed += Time.deltaTime;
                 float t = elapsed / windupDuration;
-                t = Mathf.Sin(t * Mathf.PI * 0.5f); // イージング
+                t = Mathf.Sin(t * Mathf.PI * 0.5f);
 
-                float angle = Mathf.Lerp(0f, swingStartAngle + 20f, t);
+                float angle = Mathf.Lerp(0f, 75f, t); // 高く振りかぶる (+75度)
                 if (visualsTransform != null)
                 {
-                    visualsTransform.localRotation = Quaternion.Euler(0, 0, angle);
+                    Quaternion rot = Quaternion.Euler(0, 0, angle);
+                    visualsTransform.localRotation = rot;
+                    visualsTransform.localPosition = handPivot + rot * weaponOffset;
                 }
                 yield return null;
             }
 
-            // 2. 攻撃判定の有効化 (予備動作の直後に発生！)
+            // 2. 振り下ろしの瞬間に攻撃判定（Hitbox）を有効化！スキンと同じサイズ（1.2 x 0.8）に設定！
             if (hitbox != null)
             {
-                StartCoroutine(ActivateHitboxTemporarily(hitbox.gameObject, 0.22f));
+                hitbox.transform.localPosition = normalWeaponPos;
+                BoxCollider2D col = hitbox.GetComponent<BoxCollider2D>();
+                if (col != null)
+                {
+                    col.size = normalWeaponSize; // 武器スキンと同じ大きさと長さに同期！
+                }
+                StartCoroutine(ActivateHitboxTemporarily(hitbox.gameObject, swingDuration));
             }
 
-            // 3. 振り下ろしフェーズ (0.18秒)
+            // 3. 振り下ろしフェーズ: 地面に向かって前方に超大弧一気斬り (-95度) (0.16秒)
             elapsed = 0f;
             while (elapsed < swingDuration)
             {
@@ -197,22 +270,23 @@ namespace FightingGameBase
                 float t = elapsed / swingDuration;
                 t = t * t; 
                 
-                float angle = Mathf.Lerp(swingStartAngle + 20f, swingEndAngle, t);
+                float angle = Mathf.Lerp(75f, -95f, t); // +75度から-95度まで170度の大斬撃！
                 if (visualsTransform != null)
                 {
-                    visualsTransform.localRotation = Quaternion.Euler(0, 0, angle);
+                    Quaternion rot = Quaternion.Euler(0, 0, angle);
+                    visualsTransform.localRotation = rot;
+                    visualsTransform.localPosition = handPivot + rot * weaponOffset;
+                    if (weaponSr != null)
+                    {
+                        weaponSr.color = Color.Lerp(new Color(1f, 0.9f, 0.2f, 1f), origColor, t);
+                    }
                 }
                 yield return null;
             }
 
-            if (visualsTransform != null)
-            {
-                visualsTransform.localRotation = Quaternion.Euler(0, 0, swingEndAngle);
-            }
-            
             yield return new WaitForSeconds(0.04f);
 
-            // 4. 回収（フォロースルー）フェーズ (0.28秒)
+            // 4. 回収（フォロースルー）フェーズ (0.22秒)
             elapsed = 0f;
             while (elapsed < recoverDuration)
             {
@@ -220,16 +294,26 @@ namespace FightingGameBase
                 float t = elapsed / recoverDuration;
                 t = Mathf.Sin(t * Mathf.PI * 0.5f);
                 
-                float angle = Mathf.Lerp(swingEndAngle, 0f, t);
+                float angle = Mathf.Lerp(-95f, 0f, t);
                 if (visualsTransform != null)
                 {
-                    visualsTransform.localRotation = Quaternion.Euler(0, 0, angle);
+                    Quaternion rot = Quaternion.Euler(0, 0, angle);
+                    visualsTransform.localRotation = rot;
+                    visualsTransform.localPosition = handPivot + rot * weaponOffset;
+                    if (weaponSr != null)
+                    {
+                        weaponSr.color = Color.Lerp(origColor, Color.white, t);
+                    }
                 }
                 yield return null;
             }
 
             if (visualsTransform != null)
+            {
                 visualsTransform.localRotation = Quaternion.identity;
+                visualsTransform.localPosition = normalWeaponPos;
+                if (weaponSr != null) weaponSr.color = origColor;
+            }
 
             Debug.Log("Taiken animation: swing completed.");
             isSwinging = false;
@@ -273,18 +357,8 @@ namespace FightingGameBase
             Vector3 origPos = hitbox != null ? hitbox.transform.localPosition : Vector3.zero;
             Vector2 origSize = col != null ? col.size : Vector2.zero;
 
-            // Instantly enlarge the weapon visual using Sliced SpriteRenderer.size
-            if (visualsTransform != null)
-            {
-                visualsTransform.localPosition = specialWeaponPos;
-                visualsTransform.localScale = Vector3.one; // Keep scale at 1.0 for sliced mode
-
-                if (weaponSr != null)
-                {
-                    weaponSr.drawMode = SpriteDrawMode.Sliced;
-                    weaponSr.size = specialWeaponSize; // Set exact unit size
-                }
-            }
+            // Enlarge weapon visual to match special attack size exactly
+            ApplyWeaponVisualSize(specialWeaponSize, specialWeaponPos);
 
             // Phase 1: Charging
             Debug.Log("Charged Swing: Phase 1 (Charge) started.");
@@ -315,8 +389,8 @@ namespace FightingGameBase
 
                 if (col != null)
                 {
-                    hitbox.transform.localPosition = new Vector3(1.6f, 0.6f, 0f);
-                    col.size = new Vector2(2.5f, 1.0f);
+                    hitbox.transform.localPosition = specialWeaponPos;
+                    col.size = specialWeaponSize;
                 }
 
                 StartCoroutine(ActivateHitboxTemporarily(hitbox.gameObject, chargeReleaseDuration + 0.08f));
@@ -360,6 +434,34 @@ namespace FightingGameBase
             isSwinging = false;
         }
 
+        private void ApplyWeaponVisualSize(Vector2 targetSize, Vector3 targetPos)
+        {
+            if (visualsTransform == null) return;
+
+            visualsTransform.localPosition = targetPos;
+            SpriteRenderer weaponSr = visualsTransform.GetComponent<SpriteRenderer>();
+
+            if (weaponSr != null)
+            {
+                if (weaponSr.drawMode == SpriteDrawMode.Sliced && weaponSr.sprite != null && weaponSr.sprite.border != Vector4.zero)
+                {
+                    visualsTransform.localScale = Vector3.one;
+                    weaponSr.size = targetSize;
+                }
+                else
+                {
+                    weaponSr.drawMode = SpriteDrawMode.Simple;
+                    float baseW = (weaponSr.sprite != null && weaponSr.sprite.bounds.size.x > 0) ? weaponSr.sprite.bounds.size.x : 1.2f;
+                    float baseH = (weaponSr.sprite != null && weaponSr.sprite.bounds.size.y > 0) ? weaponSr.sprite.bounds.size.y : 0.8f;
+                    visualsTransform.localScale = new Vector3(targetSize.x / baseW, targetSize.y / baseH, 1f);
+                }
+            }
+            else
+            {
+                visualsTransform.localScale = new Vector3(targetSize.x / normalWeaponSize.x, targetSize.y / normalWeaponSize.y, 1f);
+            }
+        }
+
         private IEnumerator RestoreDamageAndSize(Hitbox hitbox, BoxCollider2D col, SpriteRenderer weaponSr, int originalDamage, Vector3 originalPos, Vector2 originalSize, float delay)
         {
             yield return new WaitForSeconds(delay);
@@ -374,17 +476,7 @@ namespace FightingGameBase
             {
                 col.size = originalSize;
             }
-            if (visualsTransform != null)
-            {
-                visualsTransform.localPosition = normalWeaponPos;
-                visualsTransform.localScale = Vector3.one;
-
-                if (weaponSr != null)
-                {
-                    weaponSr.drawMode = SpriteDrawMode.Sliced;
-                    weaponSr.size = normalWeaponSize;
-                }
-            }
+            ApplyWeaponVisualSize(normalWeaponSize, normalWeaponPos);
         }
 
         [Header("Block & Parry Settings")]
@@ -399,22 +491,22 @@ namespace FightingGameBase
         {
             if (isDead || isSwinging || isGuardBroken) return;
 
-            isBlocking = true;
-            isBlockingState = true;
-
             // DeepWoken Block Spam Prevention: Check parry cooldown
             if (Time.time - lastParryTime < parryCooldown)
             {
                 isParrying = false;
-                Debug.Log("Block start (Parry on Cooldown - Block Only).");
+                isBlocking = false;
+                isBlockingState = false;
+                Debug.Log("Block start ignored (Parry on Cooldown - Shield disabled).");
+                return;
             }
-            else
-            {
-                isParrying = true;
-                lastParryTime = Time.time;
-                Debug.Log("Block start (Parry Window Active).");
-                StartCoroutine(CloseParryWindow());
-            }
+
+            isBlocking = true;
+            isBlockingState = true;
+            isParrying = true;
+            lastParryTime = Time.time;
+            Debug.Log("Block start (Parry Window Active).");
+            StartCoroutine(CloseParryWindow());
 
             if (blockShield != null)
             {
@@ -427,11 +519,7 @@ namespace FightingGameBase
 
                 if (shieldSr.sprite == null)
                 {
-                    SpriteRenderer charSr = GetComponentInChildren<SpriteRenderer>();
-                    if (charSr != null)
-                    {
-                        shieldSr.sprite = charSr.sprite;
-                    }
+                    shieldSr.sprite = GetDefaultCircleSprite();
                 }
                 
                 shieldSr.drawMode = SpriteDrawMode.Sliced;

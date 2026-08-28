@@ -46,51 +46,115 @@ namespace FightingGameBase
         // DeepWoken Parry Cooldown variables
         private float lastParryTime = -10f;
         private float parryCooldown = 0.35f;
+        private static Sprite defaultCircleSprite;
+        private static Sprite GetDefaultCircleSprite()
+        {
+            if (defaultCircleSprite != null) return defaultCircleSprite;
+            int size = 64;
+            Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            Color[] colors = new Color[size * size];
+            float center = (size - 1) / 2f;
+            float radius = size / 2f - 1f;
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = x - center;
+                    float dy = y - center;
+                    float dist = Mathf.Sqrt(dx * dx + dy * dy);
+                    float alpha = Mathf.Clamp01(radius + 1f - dist);
+                    colors[y * size + x] = new Color(1f, 1f, 1f, alpha);
+                }
+            }
+            tex.SetPixels(colors);
+            tex.Apply();
+
+            defaultCircleSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
+            return defaultCircleSprite;
+        }
+
+        [Header("Dagger Weapon & Hitbox Settings")]
+        public Vector2 daggerHitboxSize = new Vector2(1.4f, 0.6f);
+        public Vector3 daggerHitboxPos = new Vector3(0.7f, 0.5f, 0f);
+
+        private static Sprite defaultSquareSprite;
+        private static Sprite GetDefaultSquareSprite()
+        {
+            if (defaultSquareSprite != null) return defaultSquareSprite;
+            Texture2D tex = new Texture2D(32, 32, TextureFormat.RGBA32, false);
+            Color[] colors = new Color[32 * 32];
+            for (int i = 0; i < colors.Length; i++) colors[i] = Color.white;
+            tex.SetPixels(colors);
+            tex.Apply();
+            defaultSquareSprite = Sprite.Create(tex, new Rect(0, 0, 32, 32), new Vector2(0.5f, 0.5f));
+            return defaultSquareSprite;
+        }
+
+        public void ApplyWeaponVisualSize(Vector2 targetSize, Vector3 targetLocalPos)
+        {
+            if (visualsTransform == null) return;
+
+            visualsTransform.localPosition = targetLocalPos;
+
+            SpriteRenderer weaponSr = visualsTransform.GetComponent<SpriteRenderer>();
+            if (weaponSr != null)
+            {
+                if (weaponSr.drawMode == SpriteDrawMode.Sliced && weaponSr.sprite != null && weaponSr.sprite.border != Vector4.zero)
+                {
+                    visualsTransform.localScale = Vector3.one;
+                    weaponSr.size = targetSize;
+                }
+                else
+                {
+                    weaponSr.drawMode = SpriteDrawMode.Simple;
+                    float baseW = (weaponSr.sprite != null && weaponSr.sprite.bounds.size.x > 0) ? weaponSr.sprite.bounds.size.x : 1f;
+                    float baseH = (weaponSr.sprite != null && weaponSr.sprite.bounds.size.y > 0) ? weaponSr.sprite.bounds.size.y : 1f;
+                    visualsTransform.localScale = new Vector3(targetSize.x / baseW, targetSize.y / baseH, 1f);
+                }
+            }
+        }
 
         protected override void Start()
         {
             base.Start();
 
-            // 武器オブジェクト（Visuals/Weapon）のTransformを特定し、回転・移動の対象にします（キャラクターは動かさず武器だけ動かすため）
-            visualsTransform = transform.Find("Visuals/Weapon");
-            if (visualsTransform == null)
+            // 武器オブジェクト（Visuals/Weapon）のTransformを特定
+            Transform visualsRoot = transform.Find("Visuals");
+            if (visualsRoot == null)
             {
-                // バックアップとして従来のVisualsやHoverEffectを使用します
-                HoverEffect hover = GetComponentInChildren<HoverEffect>(true);
-                if (hover != null)
-                {
-                    visualsTransform = hover.transform;
-                }
-                else
-                {
-                    visualsTransform = transform.Find("Visuals");
-                }
+                GameObject visObj = new GameObject("Visuals");
+                visObj.transform.SetParent(transform, false);
+                visualsRoot = visObj.transform;
             }
 
+            visualsTransform = visualsRoot.Find("Weapon");
             if (visualsTransform == null)
             {
-                Debug.LogError($"[DaggerCharacter] 見た目オブジェクト（Visuals）が見つかりませんでした！");
+                GameObject weaponObj = new GameObject("Weapon");
+                weaponObj.transform.SetParent(visualsRoot, false);
+                weaponObj.transform.localPosition = daggerHitboxPos;
+                weaponObj.transform.localScale = Vector3.one;
+
+                SpriteRenderer weaponSr = weaponObj.AddComponent<SpriteRenderer>();
+                weaponSr.sprite = GetDefaultSquareSprite();
+                weaponSr.color = new Color(0.75f, 0.78f, 0.85f, 1f);
+                weaponSr.sortingOrder = 5;
+                visualsTransform = weaponObj.transform;
             }
-            else
+
+            Hitbox hitbox = GetComponentInChildren<Hitbox>(true);
+            if (hitbox != null)
             {
-                // Automatically adjust weapon sprite size to match the PunchHitbox collider size at runtime
-                Hitbox hitbox = GetComponentInChildren<Hitbox>(true);
-                if (hitbox != null)
+                BoxCollider2D boxCol = hitbox.GetComponent<BoxCollider2D>();
+                if (boxCol != null)
                 {
-                    BoxCollider2D boxCol = hitbox.GetComponent<BoxCollider2D>();
-                    if (boxCol != null)
-                    {
-                        SpriteRenderer weaponSr = visualsTransform.GetComponent<SpriteRenderer>();
-                        if (weaponSr != null)
-                        {
-                            visualsTransform.localScale = Vector3.one;
-                            weaponSr.drawMode = SpriteDrawMode.Sliced;
-                            weaponSr.size = boxCol.size;
-                            visualsTransform.localPosition = hitbox.transform.localPosition;
-                        }
-                    }
+                    boxCol.size = daggerHitboxSize;
                 }
+                hitbox.transform.localPosition = daggerHitboxPos;
             }
+
+            ApplyWeaponVisualSize(daggerHitboxSize, daggerHitboxPos);
 
             // Find the block shield GameObject using deep search to avoid hierarchy mismatch.
             Transform shieldTrans = FindDeepChild(transform, "BlockShield");
@@ -174,7 +238,7 @@ namespace FightingGameBase
         {
             isSwinging = true;
             float elapsed = 0f;
-            Vector3 originalLocalPos = visualsTransform != null ? visualsTransform.localPosition : Vector3.zero;
+            Vector3 originalLocalPos = visualsTransform != null ? visualsTransform.localPosition : daggerHitboxPos;
 
             // 1. 予備動作（ウィンドアップ）: ダガーを後ろに引く (0.15秒)
             float windupDuration = 0.15f;
@@ -411,22 +475,22 @@ namespace FightingGameBase
         {
             if (isDead || isSwinging || isSpecialAttacking || isGuardBroken) return;
 
-            isBlocking = true;
-            isBlockingState = true;
-
             // DeepWoken Block Spam Prevention: Check parry cooldown
             if (Time.time - lastParryTime < parryCooldown)
             {
                 isParrying = false;
-                Debug.Log("ダガーブロック開始（パリークールダウン中 - ブロックのみ）");
+                isBlocking = false;
+                isBlockingState = false;
+                Debug.Log("ダガーブロック開始無効（パリークールダウン中 - シールド非表示）");
+                return;
             }
-            else
-            {
-                isParrying = true;
-                lastParryTime = Time.time;
-                Debug.Log("ダガーブロック開始！パリー受付窓オープン！");
-                StartCoroutine(CloseParryWindow());
-            }
+
+            isBlocking = true;
+            isBlockingState = true;
+            isParrying = true;
+            lastParryTime = Time.time;
+            Debug.Log("ダガーブロック開始！パリー受付窓オープン！");
+            StartCoroutine(CloseParryWindow());
 
             if (blockCoroutine != null) StopCoroutine(blockCoroutine);
             blockCoroutine = StartCoroutine(BlockEnterRoutine());
@@ -441,11 +505,7 @@ namespace FightingGameBase
 
                 if (shieldSr.sprite == null)
                 {
-                    SpriteRenderer charSr = GetComponentInChildren<SpriteRenderer>();
-                    if (charSr != null)
-                    {
-                        shieldSr.sprite = charSr.sprite;
-                    }
+                    shieldSr.sprite = GetDefaultCircleSprite();
                 }
                 
                 shieldSr.drawMode = SpriteDrawMode.Sliced;

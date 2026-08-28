@@ -58,6 +58,35 @@ namespace FightingGameBase
         private Text p1ComboText;
         private Coroutine p1ComboCoroutine;
 
+        private Sprite circleSprite;
+        private Sprite GetCircleSprite()
+        {
+            if (circleSprite != null) return circleSprite;
+
+            int size = 64;
+            Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            Color[] colors = new Color[size * size];
+            float center = (size - 1) / 2f;
+            float radius = size / 2f - 1f;
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = x - center;
+                    float dy = y - center;
+                    float dist = Mathf.Sqrt(dx * dx + dy * dy);
+                    float alpha = Mathf.Clamp01(radius + 1f - dist);
+                    colors[y * size + x] = new Color(1f, 1f, 1f, alpha);
+                }
+            }
+            tex.SetPixels(colors);
+            tex.Apply();
+
+            circleSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
+            return circleSprite;
+        }
+
         private Text p2ComboText;
         private Coroutine p2ComboCoroutine;
         private Coroutine shakeCoroutine;
@@ -233,7 +262,7 @@ namespace FightingGameBase
 
             // Circular frame for timer
             Image timerFrame = timerPanel.AddComponent<Image>();
-            timerFrame.sprite = Resources.GetBuiltinResource<Sprite>("UI/Skin/Knob.psd");
+            timerFrame.sprite = GetCircleSprite();
             timerFrame.color = new Color(0.12f, 0.12f, 0.16f, 0.9f);
             
             // Thin border ring for timer circle
@@ -244,7 +273,7 @@ namespace FightingGameBase
             ringRect.anchorMax = Vector2.one;
             ringRect.sizeDelta = new Vector2(4, 4);
             Image ringImg = timerRing.AddComponent<Image>();
-            ringImg.sprite = Resources.GetBuiltinResource<Sprite>("UI/Skin/Knob.psd");
+            ringImg.sprite = GetCircleSprite();
             ringImg.color = new Color(0.7f, 0.7f, 0.75f, 0.8f);
             timerRing.transform.SetAsFirstSibling();
 

@@ -49,8 +49,8 @@ namespace FightingGameBase
         /// </summary>
         public bool HasUsedStun => hasUsedStun;
 
-        // 被ダメージ後、一定時間（0.25秒）通常攻撃・特殊攻撃を出せないようにするロック判定
-        public bool IsHurtLocked => Time.time - lastHurtTime < 0.25f;
+        // 被ダメージ後、一定時間（0.2秒）被弾反動で攻撃を出せないようにするロック判定
+        public bool IsHurtLocked => Time.time - lastHurtTime < 0.2f;
 
         [Header("DeepWoken Posture & Mana Settings")]
         public float maxPosture = 100f;
@@ -71,6 +71,7 @@ namespace FightingGameBase
             animator = GetComponentInChildren<Animator>();
             if (animator != null && animator.runtimeAnimatorController == null)
             {
+                animator.enabled = false;
                 animator = null;
             }
 
@@ -83,6 +84,7 @@ namespace FightingGameBase
                 maxHP = maxHP * 2;
             }
             currentHP = maxHP;
+            currentMana = maxMana;
 
             // Auto-instantiate HUDManager if it's missing in the scene
             if (FindAnyObjectByType<HUDManager>() == null)
@@ -127,9 +129,12 @@ namespace FightingGameBase
 
             SafeSetBool("IsGrounded", isGrounded);
 
-            // (Natural posture recovery when not blocking has been disabled as requested)
-
-            // (Natural mana recovery when idle has been disabled as requested)
+            // Natural mana recovery
+            if (currentMana < maxMana)
+            {
+                currentMana += manaRegenSpeed * Time.deltaTime;
+                if (currentMana > maxMana) currentMana = maxMana;
+            }
         }
 
         // 攻撃ヒット時やイベント時にマナを増加させるメソッド
@@ -201,6 +206,8 @@ namespace FightingGameBase
             Debug.Log("Ultimate attack triggered.");
         }
 
+        private Coroutine hitFlashCoroutine;
+
         public virtual void TakeDamage(int damage, Hitbox attackerHitbox = null)
         {
             if (isDead || isInvincible) return;
@@ -218,6 +225,18 @@ namespace FightingGameBase
 
             SafeSetTrigger("Damage");
 
+            // 被弾時にキャラが明るく赤色にフラッシュする反動演出（目に見える被弾フィードバック）
+            if (hitFlashCoroutine != null) StopCoroutine(hitFlashCoroutine);
+            hitFlashCoroutine = StartCoroutine(PlayHitFlashRoutine());
+
+            // 攻撃判定からのノックバック反動（吹き飛び）
+            if (rb != null && attackerHitbox != null)
+            {
+                float pushDir = Mathf.Sign(transform.position.x - attackerHitbox.transform.position.x);
+                if (pushDir == 0) pushDir = 1f;
+                rb.linearVelocity = new Vector2(pushDir * 4.5f, 2.0f);
+            }
+
             // Register hit in HUD for damage popups, combos, and HP bars
             if (HUDManager.Instance != null)
             {
@@ -227,6 +246,24 @@ namespace FightingGameBase
             if (currentHP == 0)
             {
                 Die();
+            }
+        }
+
+        private IEnumerator PlayHitFlashRoutine()
+        {
+            SpriteRenderer[] srs = GetComponentsInChildren<SpriteRenderer>();
+            Color[] origColors = new Color[srs.Length];
+            for (int i = 0; i < srs.Length; i++)
+            {
+                origColors[i] = srs[i].color;
+                srs[i].color = new Color(1f, 0.2f, 0.2f, 1f); // 赤色に被弾フラッシュ
+            }
+
+            yield return new WaitForSeconds(0.2f);
+
+            for (int i = 0; i < srs.Length; i++)
+            {
+                if (srs[i] != null) srs[i].color = origColors[i];
             }
         }
 
@@ -262,6 +299,32 @@ namespace FightingGameBase
         protected virtual void LateUpdate()
         {
             PreventCharacterOverlap();
+            ClampToStageBoundaries();
+        }
+
+        private void ClampToStageBoundaries()
+        {
+            if (isDead) return;
+
+            float minX = -12.0f;
+            float maxX = 12.0f;
+
+            if (transform.position.x < minX)
+            {
+                transform.position = new Vector3(minX, transform.position.y, transform.position.z);
+                if (rb != null && rb.linearVelocity.x < 0)
+                {
+                    rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+                }
+            }
+            else if (transform.position.x > maxX)
+            {
+                transform.position = new Vector3(maxX, transform.position.y, transform.position.z);
+                if (rb != null && rb.linearVelocity.x > 0)
+                {
+                    rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+                }
+            }
         }
 
         private void PreventCharacterOverlap()

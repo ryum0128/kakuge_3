@@ -38,13 +38,30 @@ namespace FightingGameBase.Editor
             BoxCollider2D collider = floor.AddComponent<BoxCollider2D>();
             collider.size = new Vector2(25f, 1f);
 
+            // 4. 透明な壁（左右の枠外移動防止用コライダー）の設定
+            if (GameObject.Find("Left_Invisible_Wall") == null)
+            {
+                GameObject leftWall = new GameObject("Left_Invisible_Wall");
+                leftWall.transform.position = new Vector3(-12.5f, 8f, 0f);
+                BoxCollider2D leftCol = leftWall.AddComponent<BoxCollider2D>();
+                leftCol.size = new Vector2(1f, 25f);
+            }
+
+            if (GameObject.Find("Right_Invisible_Wall") == null)
+            {
+                GameObject rightWall = new GameObject("Right_Invisible_Wall");
+                rightWall.transform.position = new Vector3(12.5f, 8f, 0f);
+                BoxCollider2D rightCol = rightWall.AddComponent<BoxCollider2D>();
+                rightCol.size = new Vector2(1f, 25f);
+            }
+
             // シーンの変更をマークして保存できるようにする
             EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
 
             // 作成した床を選択状態にする
             Selection.activeGameObject = floor;
             
-            Debug.Log("【完了】シーンに床（地面）を作成しました。位置: (0, -2, 0)、サイズ: (25, 1)");
+            Debug.Log("【完了】シーンに床および透明な壁（左右境界）を作成しました。");
         }
     }
 }
