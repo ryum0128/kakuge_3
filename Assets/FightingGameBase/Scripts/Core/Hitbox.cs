@@ -83,6 +83,17 @@ namespace FightingGameBase
                     // 相手にダメージを与えます！
                     hurtbox.TakeDamage(damage, this);
 
+                    // ヒットストップの適用 (ダメージ量に応じた停止フレーム数)
+                    if (HUDManager.Instance != null)
+                    {
+                        int hitStopFrames = 3;
+                        if (damage >= 40) hitStopFrames = 8;       // 重攻撃/必殺技
+                        else if (damage >= 25) hitStopFrames = 5;  // 中攻撃/特殊攻撃
+                        else if (damage < 15) hitStopFrames = 2;   // 軽攻撃
+                        
+                        HUDManager.Instance.TriggerHitStop(hitStopFrames);
+                    }
+
                     // 通常攻撃かつ攻撃主が存在する場合、攻撃主のマナを少量（10f）回復する
                     if (isNormalAttack && owner != null)
                     {

@@ -61,6 +61,9 @@ namespace FightingGameBase
         private Text p2ComboText;
         private Coroutine p2ComboCoroutine;
         private Coroutine shakeCoroutine;
+        private Coroutine activeHitStopCoroutine;
+        private float originalTimeScale = 1f;
+        private bool isHitStopping = false;
 
         // Cache gradients to avoid memory leaks
         private Sprite p1HpGradient;
@@ -513,12 +516,21 @@ namespace FightingGameBase
 
         public void TriggerHitStop(int frames)
         {
-            StartCoroutine(HitStopRoutine(frames));
+            if (activeHitStopCoroutine != null)
+            {
+                StopCoroutine(activeHitStopCoroutine);
+            }
+            activeHitStopCoroutine = StartCoroutine(HitStopRoutine(frames));
         }
 
         private IEnumerator HitStopRoutine(int frames)
         {
-            float oldTimeScale = Time.timeScale;
+            if (!isHitStopping)
+            {
+                originalTimeScale = Time.timeScale > 0f ? Time.timeScale : 1f;
+                isHitStopping = true;
+            }
+            
             Time.timeScale = 0f;
 
             for (int i = 0; i < frames; i++)
@@ -526,7 +538,9 @@ namespace FightingGameBase
                 yield return null; // Resumes regardless of timeScale
             }
 
-            Time.timeScale = oldTimeScale;
+            Time.timeScale = originalTimeScale;
+            isHitStopping = false;
+            activeHitStopCoroutine = null;
         }
 
         public void RegisterHit(int victimPlayerID, int damage, Vector3 position)

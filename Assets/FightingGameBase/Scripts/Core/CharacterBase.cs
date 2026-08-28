@@ -184,7 +184,7 @@ namespace FightingGameBase
             }
         }
 
-        public void Jump()
+        public virtual void Jump()
         {
             if (isDead || !isGrounded || isStunned) return;
 
