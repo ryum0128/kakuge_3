@@ -84,8 +84,7 @@ namespace FightingGameBase
                         if (weaponSr != null)
                         {
                             visualsTransform.localScale = Vector3.one;
-                            weaponSr.drawMode = SpriteDrawMode.Sliced;
-                            weaponSr.size = boxCol.size;
+                            if (weaponSr.sprite != null && !weaponSr.sprite.name.Contains("UISprite")) { weaponSr.drawMode = SpriteDrawMode.Simple; } else { weaponSr.drawMode = SpriteDrawMode.Sliced; weaponSr.size = boxCol.size; }
                             visualsTransform.localPosition = hitbox.transform.localPosition;
                         }
                     }

@@ -42,11 +42,11 @@ namespace FightingGameBase
             if (col != null)
             {
                 // やられ判定は「薄い黄緑色」で表示して、わかりやすくしています。
-                Gizmos.color = new Color(0.5f, 1f, 0f, 0.4f);
+                Gizmos.color = Color.clear;
                 Gizmos.DrawCube(col.bounds.center, col.bounds.size); // 塗りつぶし
                 
                 // 箱の枠線を少し濃い黄緑色で描きます。
-                Gizmos.color = new Color(0.5f, 1f, 0f, 1f);
+                Gizmos.color = Color.clear;
                 Gizmos.DrawWireCube(col.bounds.center, col.bounds.size); // 枠線
             }
         }

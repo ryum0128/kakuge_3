@@ -124,6 +124,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FightingGameBase.Hitbox
   damage: 40
   ownerPlayerID: 1
+  postureDamageMultiplier: 1.5
+  isNormalAttack: 1
+  isProjectile: 0
+  owner: {fileID: 0}
 --- !u!1 &5430184848134747816
 GameObject:
   m_ObjectHideFlags: 0
@@ -356,9 +360,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FightingGameBase.GannrannsuCharacter
   stats: {fileID: 11400000, guid: d2aa013dec500204fafdc129877374c8, type: 2}
   playerID: 1
+  maxHP: 100
   currentHP: 0
   isGrounded: 0
   isDead: 0
+  isStunned: 0
+  isInvincible: 0
+  isDashingOrEvading: 0
+  lastHurtTime: -10
+  stunChargeTime: 10
+  stunChargeGauge: 0
+  maxPosture: 100
+  currentPosture: 0
+  postureRegenSpeed: 20
+  maxMana: 100
+  currentMana: 50
+  manaRegenSpeed: 8
+  isBlockingState: 0
   shellPrefab: {fileID: 3266458248738474479, guid: 89745e7bf172a5c46aab34c8808a98b9, type: 3}
   firePoint: {fileID: 8791138977923006493}
   dragonBlastHitbox: {fileID: 4418878614785265786}
@@ -374,12 +392,10 @@ MonoBehaviour:
   passiveChargeRate: 5
   normalHitChargeGain: 10
   specialHitChargeGain: 20
+  ultimateAttackCooldown: 3
   laserDuration: 0.5
   laserWidth: 0.25
   laserRange: 20
-  normalAttackCooldown: 0.2
-  specialAttackCooldown: 0.4
-  ultimateAttackCooldown: 2
 --- !u!114 &2077194006783114719
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -504,3 +520,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FightingGameBase.Hitbox
   damage: 12
   ownerPlayerID: 1
+  postureDamageMultiplier: 1.5
+  isNormalAttack: 1
+  isProjectile: 0
+  owner: {fileID: 0}
