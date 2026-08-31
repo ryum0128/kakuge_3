@@ -25,14 +25,23 @@ namespace FightingGameBase
         // 攻撃動作中か判定するための仮想プロパティ（派生先でオーバーライドされます）
         public virtual bool IsAttacking => false;
 
+        /// <summary>
+        /// スタンスキルを使用できるかどうか（派生クラスで true にオーバーライドすると使用可能になる）
+        /// デフォルトは false（使用不可）。ライトセーバーキャラのみ true にする。
+        /// </summary>
+        public virtual bool CanUseStunSkill => false;
+
         [HideInInspector]
         public float lastHurtTime = -10f;
 
         // --- スタンスキル用の内部変数 ---
-        private bool hasUsedStun = false;       // スタンスキルを使ったかどうか（1試合に1回）
+        private int stunUseCount = 0;            // スタンスキルの使用回数
         private Coroutine stunCoroutine = null;  // スタン解除用のコルーチン
 
         [Header("スタンスキル設定")]
+        [Tooltip("スタンスキルの最大使用回数")]
+        public int maxStunUses = 2;              // スタンスキルの使用上限（2回）
+
         [Tooltip("チャージゲージが満タンになるまでの時間（秒）")]
         public float stunChargeTime = 10f;      // ゲージが0から100%になるまでの時間
 
@@ -45,9 +54,14 @@ namespace FightingGameBase
         public bool IsStunReady => stunChargeGauge >= 1f;
 
         /// <summary>
-        /// スタンスキルが使用済みかどうかを確認できるプロパティ
+        /// スタンスキルの残り使用回数
         /// </summary>
-        public bool HasUsedStun => hasUsedStun;
+        public int StunUsesRemaining => maxStunUses - stunUseCount;
+
+        /// <summary>
+        /// スタンスキルが全回数使用済みかどうかを確認できるプロパティ
+        /// </summary>
+        public bool HasUsedStun => stunUseCount >= maxStunUses;
 
         // 被ダメージ後、一定時間（0.25秒）通常攻撃・特殊攻撃を出せないようにするロック判定
         public bool IsHurtLocked => Time.time - lastHurtTime < 0.25f;
@@ -104,8 +118,8 @@ namespace FightingGameBase
         {
             if (isDead || (GameManager.Instance != null && !GameManager.Instance.IsPlaying)) return;
 
-            // スタンチャージゲージを溜める（まだ使用済みでなく、満タンでない場合）
-            if (!hasUsedStun && stunChargeGauge < 1f)
+            // スタンチャージゲージを溜める（使用回数が残っていて、満タンでない場合）
+            if (stunUseCount < maxStunUses && stunChargeGauge < 1f)
             {
                 stunChargeGauge += Time.deltaTime / stunChargeTime;
                 stunChargeGauge = Mathf.Clamp01(stunChargeGauge); // 0～1の範囲に収める
@@ -428,6 +442,13 @@ namespace FightingGameBase
         {
             if (isDead || isStunned) return;
 
+            // スタンスキルはライトセーバーキャラクター専用
+            if (!CanUseStunSkill)
+            {
+                Debug.Log("スタンスキルはライトセーバーでしか使えません！");
+                return;
+            }
+
             // チャージゲージが満タンでない場合は使えない
             if (stunChargeGauge < 1f)
             {
@@ -435,13 +456,14 @@ namespace FightingGameBase
                 return;
             }
 
-            // すでに使用済みなら発動しない（1回限り）
-            if (hasUsedStun)
+            // 使用回数の上限に達したら発動しない
+            if (stunUseCount >= maxStunUses)
             {
-                Debug.Log("スタンスキルはもう使えません！（1回限り）");
+                Debug.Log($"スタンスキルはもう使えません！（{maxStunUses}回使用済み）");
                 return;
             }
 
+            stunUseCount++;       // 使用回数を加算
             stunChargeGauge = 0f; // ゲージをリセット
 
             // スタンスキルのアニメーション（あれば再生）

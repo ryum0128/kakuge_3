@@ -95,6 +95,13 @@ namespace FightingGameBase
                 GameObject stunGo = new GameObject("StunGaugeUI");
                 stunGo.AddComponent<StunGaugeUI>();
             }
+
+            // Auto-instantiate WhipSkillGaugeUI if a whip character exists and UI is missing
+            if (FindAnyObjectByType<WhipCharacter>() != null && FindAnyObjectByType<WhipSkillGaugeUI>() == null)
+            {
+                GameObject whipGaugeGo = new GameObject("WhipSkillGaugeUI");
+                whipGaugeGo.AddComponent<WhipSkillGaugeUI>();
+            }
         }
 
         void OnDestroy()

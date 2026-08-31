@@ -65,6 +65,12 @@ namespace FightingGameBase
 
             foreach (CharacterBase character in characters)
             {
+                // スタンスキルを使えるキャラクター（ライトセーバー）のみゲージを表示
+                if (!character.CanUseStunSkill) continue;
+
+                // 全回数使用済みならゲージを完全に消失させる
+                if (character.HasUsedStun) continue;
+
                 DrawStunGauge(character);
             }
         }
@@ -81,12 +87,12 @@ namespace FightingGameBase
             if (character.playerID == 1)
             {
                 xPos = 20f;        // 1P: 画面左側
-                label = "1P スタン";
+                label = $"1P スタン (残り{character.StunUsesRemaining}回)";
             }
             else
             {
                 xPos = Screen.width - gaugeWidth - 20f; // 2P: 画面右側
-                label = "2P スタン";
+                label = $"2P スタン (残り{character.StunUsesRemaining}回)";
             }
 
             // ゲージのY座標（画面下部）
@@ -103,16 +109,7 @@ namespace FightingGameBase
             // --- ゲージの中身を描画 ---
             float fillAmount = Mathf.Clamp01(character.stunChargeGauge);
 
-            if (character.HasUsedStun)
-            {
-                // 使用済み → 灰色でゲージ全体を塗る
-                GUI.DrawTexture(bgRect, usedTexture);
-
-                // テキスト表示：「USED」
-                gaugeTextStyle.normal.textColor = new Color(0.7f, 0.7f, 0.7f);
-                GUI.Label(bgRect, "USED", gaugeTextStyle);
-            }
-            else if (fillAmount >= 1f)
+            if (fillAmount >= 1f)
             {
                 // 満タン → 緑色で全体を塗る
                 Rect fillRect = new Rect(xPos, yPos, gaugeWidth, gaugeHeight);

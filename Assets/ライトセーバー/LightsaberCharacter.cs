@@ -19,6 +19,7 @@ namespace FightingGameBase
         private Coroutine currentSwingCoroutine;
         private bool isSwinging = false;
         public override bool IsAttacking => isSwinging;
+        public override bool CanUseStunSkill => true; // ライトセーバーのみスタンスキル使用可能
         private bool isCounterStance = false;
         private SpriteRenderer spriteRenderer;
         private TrailRenderer trailRenderer;

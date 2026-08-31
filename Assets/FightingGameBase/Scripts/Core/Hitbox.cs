@@ -26,6 +26,40 @@ namespace FightingGameBase
         [Tooltip("これが飛び道具（遠距離攻撃）かどうか")]
         public bool isProjectile = false;
 
+        // =========================================================
+        // 距離ベースダメージ補正（鞭など、先端が強く根元が弱い武器用）
+        // =========================================================
+        [Header("距離ベースダメージ補正")]
+        [Tooltip("有効にすると、攻撃の当たった位置がオーナーから遠いほどダメージが高く、近いほど低くなります")]
+        public bool useDistanceScaling = false;
+
+        [Tooltip("根元（最も近い位置）でのダメージ倍率（例: 0.4 = 40%のダメージ）")]
+        public float nearDamageMultiplier = 0.4f;
+
+        [Tooltip("先端（最も遠い位置）でのダメージ倍率（例: 1.8 = 180%のダメージ）")]
+        public float farDamageMultiplier = 1.8f;
+
+        [Tooltip("距離補正の最大有効距離。この距離以上で先端倍率が適用されます")]
+        public float maxScalingDistance = 4.0f;
+
+        // =========================================================
+        // 時間経過ダメージ補正
+        // =========================================================
+        [Header("時間経過ダメージ補正")]
+        [Tooltip("有効にすると、攻撃判定が出現してからの時間が経つほどダメージが変化します")]
+        public bool useTimeScaling = false;
+
+        [Tooltip("時間経過の最大時間（この時間で最終倍率になります）")]
+        public float maxTimeScalingDuration = 0.6f;
+
+        [Tooltip("出現直後のダメージ倍率")]
+        public float startDamageMultiplier = 1.0f;
+
+        [Tooltip("最大時間経過時のダメージ倍率（例: 0.2 = 20%まで低下）")]
+        public float endDamageMultiplier = 0.3f;
+
+        private float activeStartTime;
+
         [HideInInspector]
         public CharacterBase owner; // CharacterBase（攻撃側の本体）への参照
 
@@ -37,6 +71,7 @@ namespace FightingGameBase
 
         private void OnEnable()
         {
+            activeStartTime = Time.time;
             hitCharacters.Clear();
             CheckOverlap();
         }
@@ -80,8 +115,11 @@ namespace FightingGameBase
                 {
                     hitCharacters.Add(hurtbox.owner);
 
+                    // 実際に与えるダメージを計算（距離ベース補正がある場合はそれを適用）
+                    int finalDamage = CalculateDamage(hurtbox.transform.position);
+
                     // 相手にダメージを与えます！
-                    hurtbox.TakeDamage(damage, this);
+                    hurtbox.TakeDamage(finalDamage, this);
 
                     // 通常攻撃かつ攻撃主が存在する場合、攻撃主のマナを少量（10f）回復する
                     if (isNormalAttack && owner != null)
@@ -90,13 +128,49 @@ namespace FightingGameBase
                     }
 
                     // 攻撃が当たったことを通知します
-                    OnHitLanded?.Invoke(hurtbox, damage);
+                    OnHitLanded?.Invoke(hurtbox, finalDamage);
 
                     // 【改造のヒント】
                     // もし「攻撃が当たったときに火花を出したい！」「ドカンという音を鳴らしたい！」
                     // という場合は、ここにそのプログラムを追加します！
                 }
             }
+        }
+
+        // =========================================================
+        // 距離・時間に応じたダメージ計算
+        // =========================================================
+
+        /// <summary>
+        /// 距離・時間ベースのダメージ補正を適用した最終ダメージを計算します。
+        /// </summary>
+        /// <param name="hitPosition">攻撃が当たった相手の位置</param>
+        /// <returns>補正済みの最終ダメージ値</returns>
+        public int CalculateDamage(Vector3 hitPosition)
+        {
+            float distanceMultiplier = 1.0f;
+            float timeMultiplier = 1.0f;
+
+            // 距離ベース補正
+            if (useDistanceScaling && owner != null)
+            {
+                float distance = Mathf.Abs(hitPosition.x - owner.transform.position.x);
+                float normalizedDistance = Mathf.Clamp01(distance / maxScalingDistance);
+                distanceMultiplier = Mathf.Lerp(nearDamageMultiplier, farDamageMultiplier, normalizedDistance);
+            }
+
+            // 時間ベース補正
+            if (useTimeScaling)
+            {
+                float timeActive = Time.time - activeStartTime;
+                float normalizedTime = Mathf.Clamp01(timeActive / maxTimeScalingDuration);
+                timeMultiplier = Mathf.Lerp(startDamageMultiplier, endDamageMultiplier, normalizedTime);
+            }
+
+            // 最終ダメージ（最低1ダメージ保証）
+            int finalDamage = Mathf.Max(1, Mathf.RoundToInt(damage * distanceMultiplier * timeMultiplier));
+
+            return finalDamage;
         }
 
 #if UNITY_EDITOR

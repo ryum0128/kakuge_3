@@ -15,14 +15,305 @@ namespace FightingGameBase
         
         private Coroutine currentWhipCoroutine;
         private bool isSwinging = false;
-        public override bool IsAttacking => isSwinging;
+        
+        // 振りかぶり中、または攻撃判定（ヒットボックス）がアクティブな間は「攻撃中」とみなす
+        public override bool IsAttacking => isSwinging || (whipHitbox != null && whipHitbox.gameObject.activeInHierarchy);
+        
         private TrailRenderer trailRenderer;
         private Animator anim;
 
+        // =========================================================
+        // 固有スキル「蛇鞭覚醒（Serpent Whip Awakening）」
+        // スキルゲージが満タンの時にキーを押すと発動。
+        // 攻撃距離と攻撃力が1.5倍になる（効果時間5秒）
+        // =========================================================
+        [Header("固有スキル: 蛇鞭覚醒")]
+        [Tooltip("スキルゲージが満タンになるまでの時間（秒）")]
+        public float skillChargeTime = 15f;
+
+        [Tooltip("発動時の攻撃力・攻撃距離の倍率")]
+        public float skillMultiplier = 1.5f;
+
+        [Tooltip("スキル効果の持続時間（秒）")]
+        public float skillDuration = 5f;
+
+        [Tooltip("1試合でスキルを使える上限回数")]
+        public int maxSkillUses = 1;
+
+        /// <summary>
+        /// 残りのスキル使用可能回数
+        /// </summary>
+        public int SkillUsesRemaining { get; private set; }
+
+        /// <summary>
+        /// 現在のスキルゲージ量（0.0～1.0）。外部UIから参照可能。
+        /// </summary>
+        public float SkillGauge { get; private set; } = 0f;
+
+        /// <summary>
+        /// スキルゲージが満タンかどうか
+        /// </summary>
+        public bool IsSkillReady => SkillGauge >= 1f && SkillUsesRemaining > 0;
+
+        /// <summary>
+        /// 固有スキルが発動中かどうか（外部からも参照可能）
+        /// </summary>
+        public bool IsSkillActive { get; private set; } = false;
+
+        private int originalDamage;               // 元の攻撃力（復元用に保持）
+        private float originalMaxScalingDistance;  // 元の距離補正最大距離
+        private BoxCollider2D whipCollider;        // 鞭ヒットボックスのコライダー
+        private Vector2 originalColliderSize;      // 元のコライダーサイズ
+        private Vector2 originalColliderOffset;    // 元のコライダーオフセット
+        private Vector3 originalHitboxLocalPos;    // 元のヒットボックスローカル位置
+        private Coroutine skillCoroutine;          // スキル効果コルーチン
+        private SpriteRenderer cachedSpriteRenderer; // スプライト参照キャッシュ
+        private Color originalSpriteColor;         // 元のスプライト色
+
         private void Awake()
         {
+            SkillUsesRemaining = maxSkillUses;
+
             trailRenderer = GetComponentInChildren<TrailRenderer>(true);
             anim = GetComponentInChildren<Animator>();
+
+            // 鞭ヒットボックスの距離ベースダメージ補正を有効化
+            // 先端（遠い位置）ほどダメージが大きく、根元（近い位置）ほどダメージが小さくなります
+            if (whipHitbox != null)
+            {
+                whipHitbox.useDistanceScaling = true;
+                whipHitbox.nearDamageMultiplier = 0.4f;   // 根元: 40%ダメージ（12 × 0.4 ≒ 5）
+                whipHitbox.farDamageMultiplier = 1.8f;    // 先端: 180%ダメージ（12 × 1.8 ≒ 22）
+                whipHitbox.maxScalingDistance = 4.0f;     // 最大有効距離（鞭の全長に合わせて調整）
+
+                // 時間経過で攻撃力が低下する補正を有効化
+                whipHitbox.useTimeScaling = true;
+                whipHitbox.maxTimeScalingDuration = 0.6f;
+                whipHitbox.startDamageMultiplier = 1.0f;  // 攻撃直後は100%のダメージ
+                whipHitbox.endDamageMultiplier = 0.2f;    // 0.6秒後には20%まで威力が低下
+
+
+                // 固有スキル用に元の値を記録
+                originalDamage = whipHitbox.damage;
+                originalMaxScalingDistance = whipHitbox.maxScalingDistance;
+                whipCollider = whipHitbox.GetComponent<BoxCollider2D>();
+                if (whipCollider != null)
+                {
+                    originalColliderSize = whipCollider.size;
+                    originalColliderOffset = whipCollider.offset;
+                }
+                originalHitboxLocalPos = whipHitbox.transform.localPosition;
+            }
+
+            // スプライトレンダラーをキャッシュ
+            Transform visuals = transform.Find("Visuals");
+            cachedSpriteRenderer = visuals != null ? visuals.GetComponentInChildren<SpriteRenderer>() : GetComponentInChildren<SpriteRenderer>();
+            if (cachedSpriteRenderer != null)
+            {
+                originalSpriteColor = cachedSpriteRenderer.color;
+            }
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            if (isDead) return;
+            if (GameManager.Instance != null && !GameManager.Instance.IsPlaying) return;
+
+            // スキルゲージのチャージ（発動中でない時、かつ使用回数が残っている時のみ）
+            if (!IsSkillActive && SkillGauge < 1f && SkillUsesRemaining > 0)
+            {
+                SkillGauge += Time.deltaTime / skillChargeTime;
+                SkillGauge = Mathf.Clamp01(SkillGauge);
+            }
+        }
+
+        /// <summary>
+        /// 固有スキルの発動を試みます。
+        /// PlayerInputControllerのスタンスキルキー（C / Numpad0）から呼び出されます。
+        /// </summary>
+        public override void AttackStun()
+        {
+            // ゲージが満タンでなければ発動しない
+            if (!IsSkillReady)
+            {
+                Debug.Log($"スキルゲージが足りません！（{SkillGauge * 100f:F0}%）");
+                return;
+            }
+
+            // すでに発動中なら重複発動しない
+            if (IsSkillActive)
+            {
+                Debug.Log("蛇鞭覚醒はすでに発動中！");
+                return;
+            }
+
+            if (isDead || isStunned) return;
+
+            // 回数制限チェック
+            if (SkillUsesRemaining <= 0)
+            {
+                Debug.Log("蛇鞭覚醒の使用回数上限に達しています！");
+                return;
+            }
+
+            // ゲージを消費してスキル発動
+            SkillGauge = 0f;
+            SkillUsesRemaining--;
+            skillCoroutine = StartCoroutine(UniqueSkillRoutine());
+        }
+
+        // =========================================================
+        // 固有スキル発動・効果・解除処理
+        // =========================================================
+
+        /// <summary>
+        /// 固有スキルの効果を一定時間適用し、終了後に元に戻すコルーチン。
+        /// </summary>
+        private IEnumerator UniqueSkillRoutine()
+        {
+            IsSkillActive = true;
+
+            Debug.Log("【固有スキル発動】蛇鞭覚醒！ 攻撃力と攻撃距離が1.5倍に！（5秒間）");
+
+            // --- 強化適用 ---
+            ApplySkillBuffs();
+
+            // --- 発動演出 ---
+            yield return StartCoroutine(SkillActivationEffect());
+
+            // --- 効果時間中の待機 ---
+            yield return new WaitForSeconds(skillDuration);
+
+            // --- 強化解除 ---
+            RemoveSkillBuffs();
+
+            Debug.Log("【固有スキル終了】蛇鞭覚醒の効果が切れた！");
+
+            IsSkillActive = false;
+            skillCoroutine = null;
+        }
+
+        /// <summary>
+        /// スキルの強化効果を適用します。
+        /// </summary>
+        private void ApplySkillBuffs()
+        {
+            // --- 攻撃力を1.5倍に ---
+            if (whipHitbox != null)
+            {
+                whipHitbox.damage = Mathf.RoundToInt(originalDamage * skillMultiplier);
+                whipHitbox.maxScalingDistance = originalMaxScalingDistance * skillMultiplier;
+            }
+
+            // --- 攻撃距離（ヒットボックス）を1.5倍に ---
+            if (whipCollider != null)
+            {
+                whipCollider.size = new Vector2(originalColliderSize.x * skillMultiplier, originalColliderSize.y);
+                float addedWidth = (originalColliderSize.x * skillMultiplier - originalColliderSize.x) * 0.5f;
+                whipCollider.offset = new Vector2(originalColliderOffset.x + addedWidth, originalColliderOffset.y);
+            }
+
+            // ヒットボックス位置を先端方向にずらす
+            if (whipHitbox != null)
+            {
+                float posShift = (originalHitboxLocalPos.x * skillMultiplier) - originalHitboxLocalPos.x;
+                whipHitbox.transform.localPosition = new Vector3(
+                    originalHitboxLocalPos.x + posShift * 0.5f,
+                    originalHitboxLocalPos.y,
+                    originalHitboxLocalPos.z
+                );
+            }
+        }
+
+        /// <summary>
+        /// スキルの強化効果を解除し、元のステータスに戻します。
+        /// </summary>
+        private void RemoveSkillBuffs()
+        {
+            // 攻撃力を元に戻す
+            if (whipHitbox != null)
+            {
+                whipHitbox.damage = originalDamage;
+                whipHitbox.maxScalingDistance = originalMaxScalingDistance;
+            }
+
+            // ヒットボックスサイズを元に戻す
+            if (whipCollider != null)
+            {
+                whipCollider.size = originalColliderSize;
+                whipCollider.offset = originalColliderOffset;
+            }
+
+            // ヒットボックス位置を元に戻す
+            if (whipHitbox != null)
+            {
+                whipHitbox.transform.localPosition = originalHitboxLocalPos;
+            }
+
+            // スプライトの色を元に戻す
+            if (cachedSpriteRenderer != null)
+            {
+                cachedSpriteRenderer.color = originalSpriteColor;
+            }
+        }
+
+        /// <summary>
+        /// 固有スキル発動時の視覚演出コルーチン。
+        /// キャラクターが一瞬光り輝き、スプライトの色が変わります。
+        /// </summary>
+        private IEnumerator SkillActivationEffect()
+        {
+            if (cachedSpriteRenderer == null) yield break;
+
+            // 発動の瞬間: 白く光るフラッシュ演出（3回点滅）
+            for (int i = 0; i < 3; i++)
+            {
+                cachedSpriteRenderer.color = Color.white;
+                yield return new WaitForSeconds(0.08f);
+                cachedSpriteRenderer.color = originalSpriteColor;
+                yield return new WaitForSeconds(0.08f);
+            }
+
+            // 覚醒状態の色に変更（赤みがかったピンク＝鞭の覚醒をイメージ）
+            cachedSpriteRenderer.color = new Color(1.0f, 0.7f, 0.85f, 1f);
+
+            // 一瞬だけ拡大してから戻す演出
+            Transform visuals = transform.Find("Visuals");
+            if (visuals != null)
+            {
+                Vector3 origScale = visuals.localScale;
+                float t = 0f;
+                float expandDur = 0.2f;
+                while (t < expandDur)
+                {
+                    t += Time.deltaTime;
+                    float rate = Mathf.Sin((t / expandDur) * Mathf.PI);
+                    visuals.localScale = origScale * (1f + 0.3f * rate);
+                    yield return null;
+                }
+                visuals.localScale = origScale;
+            }
+        }
+
+        /// <summary>
+        /// スタン等で状態リセットされた場合、スキルの効果も解除する
+        /// </summary>
+        public override void ResetActionStates()
+        {
+            base.ResetActionStates();
+
+            if (IsSkillActive)
+            {
+                if (skillCoroutine != null)
+                {
+                    StopCoroutine(skillCoroutine);
+                    skillCoroutine = null;
+                }
+                RemoveSkillBuffs();
+                IsSkillActive = false;
+            }
         }
 
         // =========================================================
@@ -34,7 +325,13 @@ namespace FightingGameBase
         /// </summary>
         public override void AttackNormal()
         {
-            base.AttackNormal();
+            if (isDead || isStunned) return;
+
+            // 攻撃判定を0.6秒間アクティブにする
+            if (whipHitbox != null)
+            {
+                StartCoroutine(ActivateHitboxTemporarily(whipHitbox.gameObject, 0.6f));
+            }
 
             if (anim != null && anim.runtimeAnimatorController != null)
             {
@@ -49,7 +346,7 @@ namespace FightingGameBase
                     {
                         StopCoroutine(currentWhipCoroutine);
                     }
-                    currentWhipCoroutine = StartCoroutine(WhipLashAnimation(visuals, 0.35f));
+                    currentWhipCoroutine = StartCoroutine(WhipLashAnimation(visuals, 0.6f));
                 }
             }
         }
@@ -59,7 +356,13 @@ namespace FightingGameBase
         /// </summary>
         public override void AttackSpecial()
         {
-            base.AttackSpecial();
+            if (isDead || isStunned) return;
+
+            // 攻撃判定を0.6秒間アクティブにする
+            if (whipHitbox != null)
+            {
+                StartCoroutine(ActivateHitboxTemporarily(whipHitbox.gameObject, 0.6f));
+            }
 
             if (anim != null && anim.runtimeAnimatorController != null)
             {
@@ -74,7 +377,7 @@ namespace FightingGameBase
                     {
                         StopCoroutine(currentWhipCoroutine);
                     }
-                    currentWhipCoroutine = StartCoroutine(WhipOverheadSnapAnimation(visuals, 0.48f));
+                    currentWhipCoroutine = StartCoroutine(WhipOverheadSnapAnimation(visuals, 0.6f));
                 }
             }
         }
@@ -84,7 +387,13 @@ namespace FightingGameBase
         /// </summary>
         public override void AttackUltimate()
         {
-            base.AttackUltimate();
+            if (isDead || isStunned) return;
+
+            // 攻撃判定を0.6秒間アクティブにする
+            if (whipHitbox != null)
+            {
+                StartCoroutine(ActivateHitboxTemporarily(whipHitbox.gameObject, 0.6f));
+            }
 
             if (anim != null && anim.runtimeAnimatorController != null)
             {
@@ -99,7 +408,7 @@ namespace FightingGameBase
                     {
                         StopCoroutine(currentWhipCoroutine);
                     }
-                    currentWhipCoroutine = StartCoroutine(WhipFlurryAnimation(visuals, 0.65f));
+                    currentWhipCoroutine = StartCoroutine(WhipFlurryAnimation(visuals, 0.6f));
                 }
             }
         }

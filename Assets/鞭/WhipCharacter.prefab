@@ -350,6 +350,7 @@ MonoBehaviour:
   isInvincible: 0
   isDashingOrEvading: 0
   lastHurtTime: -10
+  maxStunUses: 2
   stunChargeTime: 10
   stunChargeGauge: 0
   maxPosture: 100
