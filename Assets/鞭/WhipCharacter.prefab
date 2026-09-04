@@ -96,6 +96,14 @@ MonoBehaviour:
   postureDamageMultiplier: 1.5
   isNormalAttack: 1
   isProjectile: 0
+  useDistanceScaling: 0
+  nearDamageMultiplier: 0.4
+  farDamageMultiplier: 1.8
+  maxScalingDistance: 4
+  useTimeScaling: 0
+  maxTimeScalingDuration: 0.6
+  startDamageMultiplier: 1
+  endDamageMultiplier: 0.3
   owner: {fileID: 0}
 --- !u!1 &7471835412630515873
 GameObject:
@@ -362,6 +370,10 @@ MonoBehaviour:
   isBlockingState: 0
   whipHitbox: {fileID: 4543688310339494242}
   whipLineRenderer: {fileID: 0}
+  skillChargeTime: 15
+  skillMultiplier: 1.5
+  skillDuration: 5
+  maxSkillUses: 1
 --- !u!114 &4016932026400057407
 MonoBehaviour:
   m_ObjectHideFlags: 0
