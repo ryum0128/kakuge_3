@@ -116,51 +116,99 @@ namespace FightingGameBase
 
         private bool IsKeyPressed(Key key)
         {
-            if (Keyboard.current == null) return false;
-
-            // If checking a key for Player 2, allow non-Numpad fallbacks
-            if (character != null && character.playerID == 2)
+            if (Keyboard.current != null)
             {
-                if (key == Key.Numpad1 && Keyboard.current[Key.U].isPressed) return true;
-                if (key == Key.Numpad2 && Keyboard.current[Key.I].isPressed) return true;
-                if (key == Key.Numpad3 && Keyboard.current[Key.O].isPressed) return true;
-                if (key == Key.Numpad5 && Keyboard.current[Key.P].isPressed) return true;
-                if (key == Key.Numpad0 && Keyboard.current[Key.Y].isPressed) return true;
+                // If checking a key for Player 2, allow non-Numpad fallbacks
+                if (character != null && character.playerID == 2)
+                {
+                    if (key == Key.Numpad1 && Keyboard.current[Key.U].isPressed) return true;
+                    if (key == Key.Numpad2 && Keyboard.current[Key.I].isPressed) return true;
+                    if (key == Key.Numpad3 && Keyboard.current[Key.O].isPressed) return true;
+                    if (key == Key.Numpad5 && Keyboard.current[Key.P].isPressed) return true;
+                    if (key == Key.Numpad0 && Keyboard.current[Key.Y].isPressed) return true;
+                }
+
+                if (Keyboard.current[key].isPressed) return true;
             }
 
-            return Keyboard.current[key].isPressed;
+            return IsGamepadKeyPressed(key);
         }
 
         private bool WasKeyPressedThisFrame(Key key)
         {
-            if (Keyboard.current == null) return false;
-
-            if (character != null && character.playerID == 2)
+            if (Keyboard.current != null)
             {
-                if (key == Key.Numpad1 && Keyboard.current[Key.U].wasPressedThisFrame) return true;
-                if (key == Key.Numpad2 && Keyboard.current[Key.I].wasPressedThisFrame) return true;
-                if (key == Key.Numpad3 && Keyboard.current[Key.O].wasPressedThisFrame) return true;
-                if (key == Key.Numpad5 && Keyboard.current[Key.P].wasPressedThisFrame) return true;
-                if (key == Key.Numpad0 && Keyboard.current[Key.Y].wasPressedThisFrame) return true;
+                if (character != null && character.playerID == 2)
+                {
+                    if (key == Key.Numpad1 && Keyboard.current[Key.U].wasPressedThisFrame) return true;
+                    if (key == Key.Numpad2 && Keyboard.current[Key.I].wasPressedThisFrame) return true;
+                    if (key == Key.Numpad3 && Keyboard.current[Key.O].wasPressedThisFrame) return true;
+                    if (key == Key.Numpad5 && Keyboard.current[Key.P].wasPressedThisFrame) return true;
+                    if (key == Key.Numpad0 && Keyboard.current[Key.Y].wasPressedThisFrame) return true;
+                }
+
+                if (Keyboard.current[key].wasPressedThisFrame) return true;
             }
 
-            return Keyboard.current[key].wasPressedThisFrame;
+            return IsGamepadKeyWasPressedThisFrame(key);
         }
 
         private bool WasKeyReleasedThisFrame(Key key)
         {
-            if (Keyboard.current == null) return false;
-
-            if (character != null && character.playerID == 2)
+            if (Keyboard.current != null)
             {
-                if (key == Key.Numpad1 && Keyboard.current[Key.U].wasReleasedThisFrame) return true;
-                if (key == Key.Numpad2 && Keyboard.current[Key.I].wasReleasedThisFrame) return true;
-                if (key == Key.Numpad3 && Keyboard.current[Key.O].wasReleasedThisFrame) return true;
-                if (key == Key.Numpad5 && Keyboard.current[Key.P].wasReleasedThisFrame) return true;
-                if (key == Key.Numpad0 && Keyboard.current[Key.Y].wasReleasedThisFrame) return true;
+                if (character != null && character.playerID == 2)
+                {
+                    if (key == Key.Numpad1 && Keyboard.current[Key.U].wasReleasedThisFrame) return true;
+                    if (key == Key.Numpad2 && Keyboard.current[Key.I].wasReleasedThisFrame) return true;
+                    if (key == Key.Numpad3 && Keyboard.current[Key.O].wasReleasedThisFrame) return true;
+                    if (key == Key.Numpad5 && Keyboard.current[Key.P].wasReleasedThisFrame) return true;
+                    if (key == Key.Numpad0 && Keyboard.current[Key.Y].wasReleasedThisFrame) return true;
+                }
+
+                if (Keyboard.current[key].wasReleasedThisFrame) return true;
             }
 
-            return Keyboard.current[key].wasReleasedThisFrame;
+            return IsGamepadKeyWasReleasedThisFrame(key);
+        }
+
+        // ==========================================
+        // Xboxコントローラー対応
+        // playerID 1 → 1台目のコントローラー、playerID 2 → 2台目のコントローラーを使います
+        // ==========================================
+        private int PlayerID => character != null ? character.playerID : 1;
+
+        private bool IsGamepadKeyPressed(Key key)
+        {
+            if (key == leftKey) return GamepadInputHelper.GetMoveDirection(PlayerID) < 0f;
+            if (key == rightKey) return GamepadInputHelper.GetMoveDirection(PlayerID) > 0f;
+
+            GamepadInputHelper.GamepadAction? action = ToGamepadAction(key);
+            return action.HasValue && GamepadInputHelper.IsHeld(PlayerID, action.Value);
+        }
+
+        private bool IsGamepadKeyWasPressedThisFrame(Key key)
+        {
+            GamepadInputHelper.GamepadAction? action = ToGamepadAction(key);
+            return action.HasValue && GamepadInputHelper.WasPressedThisFrame(PlayerID, action.Value);
+        }
+
+        private bool IsGamepadKeyWasReleasedThisFrame(Key key)
+        {
+            GamepadInputHelper.GamepadAction? action = ToGamepadAction(key);
+            return action.HasValue && GamepadInputHelper.WasReleasedThisFrame(PlayerID, action.Value);
+        }
+
+        // 割り当てられているキーが、ゲームパッドのどのボタンに対応するかを判定します
+        private GamepadInputHelper.GamepadAction? ToGamepadAction(Key key)
+        {
+            if (key == jumpKey) return GamepadInputHelper.GamepadAction.Jump;
+            if (key == normalAttackKey) return GamepadInputHelper.GamepadAction.NormalAttack;
+            if (key == specialAttackKey) return GamepadInputHelper.GamepadAction.SpecialAttack;
+            if (key == blockKey) return GamepadInputHelper.GamepadAction.Block;
+            if (key == dashKey) return GamepadInputHelper.GamepadAction.Dash;
+            if (key == stunAttackKey) return GamepadInputHelper.GamepadAction.StunAttack;
+            return null;
         }
 
         void Update()
@@ -168,8 +216,8 @@ namespace FightingGameBase
             // キャラクターがいない、または倒れている場合、スタン中、被弾反動(IsHurtLocked)中は入力を受け付けません
             if (character == null || character.isDead || character.isStunned || character.IsHurtLocked) return;
 
-            // キーボードが接続されていない場合も何もしません
-            if (Keyboard.current == null) return;
+            // キーボードもゲームパッドも接続されていない場合は何もしません
+            if (Keyboard.current == null && Gamepad.all.Count == 0) return;
 
             // 移動の処理と、攻撃の処理をそれぞれ呼び出します
             HandleMovement();

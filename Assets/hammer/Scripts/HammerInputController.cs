@@ -61,23 +61,38 @@ namespace FightingGameBase
             }
 
             if (character == null || character.isDead) return;
-            if (Keyboard.current == null) return;
+            // キーボードもゲームパッドも接続されていない場合は何もしません
+            if (Keyboard.current == null && Gamepad.all.Count == 0) return;
 
             HandleMovement();
             HandleAttacks();
         }
 
+        // ==========================================
+        // Xboxコントローラー対応
+        // playerID 1 → 1台目のコントローラー、playerID 2 → 2台目のコントローラーを使います
+        // ==========================================
+        private int PlayerID => character != null ? character.playerID : 1;
+
+        private bool IsLeftPressed() => (Keyboard.current != null && Keyboard.current[leftKey].isPressed) || GamepadInputHelper.GetMoveDirection(PlayerID) < 0f;
+        private bool IsRightPressed() => (Keyboard.current != null && Keyboard.current[rightKey].isPressed) || GamepadInputHelper.GetMoveDirection(PlayerID) > 0f;
+        private bool WasJumpPressedThisFrame() => (Keyboard.current != null && Keyboard.current[jumpKey].wasPressedThisFrame) || GamepadInputHelper.WasPressedThisFrame(PlayerID, GamepadInputHelper.GamepadAction.Jump);
+        private bool WasNormalAttackPressedThisFrame() => (Keyboard.current != null && Keyboard.current[normalAttackKey].wasPressedThisFrame) || GamepadInputHelper.WasPressedThisFrame(PlayerID, GamepadInputHelper.GamepadAction.NormalAttack);
+        private bool WasNormalAttackReleasedThisFrame() => (Keyboard.current != null && Keyboard.current[normalAttackKey].wasReleasedThisFrame) || GamepadInputHelper.WasReleasedThisFrame(PlayerID, GamepadInputHelper.GamepadAction.NormalAttack);
+        private bool WasSpecialAttackPressedThisFrame() => (Keyboard.current != null && Keyboard.current[specialAttackKey].wasPressedThisFrame) || GamepadInputHelper.WasPressedThisFrame(PlayerID, GamepadInputHelper.GamepadAction.SpecialAttack);
+        private bool WasSpecialAttackReleasedThisFrame() => (Keyboard.current != null && Keyboard.current[specialAttackKey].wasReleasedThisFrame) || GamepadInputHelper.WasReleasedThisFrame(PlayerID, GamepadInputHelper.GamepadAction.SpecialAttack);
+
         private void HandleMovement()
         {
             float direction = 0f;
 
-            if (Keyboard.current[leftKey].isPressed) direction -= 1f;
-            if (Keyboard.current[rightKey].isPressed) direction += 1f;
+            if (IsLeftPressed()) direction -= 1f;
+            if (IsRightPressed()) direction += 1f;
 
             // キャラクターに移動方向を指示します
             character.Move(direction);
 
-            if (Keyboard.current[jumpKey].wasPressedThisFrame)
+            if (WasJumpPressedThisFrame())
             {
                 character.Jump();
             }
@@ -86,8 +101,8 @@ namespace FightingGameBase
         private void HandleAttacks()
         {
             // キーが「押された瞬間」かどうかをチェックします
-            bool zDown = Keyboard.current[normalAttackKey].wasPressedThisFrame;
-            bool xDown = Keyboard.current[specialAttackKey].wasPressedThisFrame;
+            bool zDown = WasNormalAttackPressedThisFrame();
+            bool xDown = WasSpecialAttackPressedThisFrame();
 
             // 押されたら、その時のゲーム内時間を記録しておきます
             if (zDown) lastZPressTime = Time.time;
@@ -149,7 +164,7 @@ namespace FightingGameBase
             }
 
             // ボタンが離されたら同時押しロックを解除
-            if (Keyboard.current[normalAttackKey].wasReleasedThisFrame || Keyboard.current[specialAttackKey].wasReleasedThisFrame)
+            if (WasNormalAttackReleasedThisFrame() || WasSpecialAttackReleasedThisFrame())
             {
                 isUltimateTriggered = false;
             }
