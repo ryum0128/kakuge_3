@@ -150,6 +150,13 @@ namespace FightingGameBase.Editor
             
             // 砲撃弾のスクリプトをアタッチ
             shellObj.AddComponent<GannrannsuShell>();
+            Hitbox shellHitbox = shellObj.GetComponent<Hitbox>();
+            if (shellHitbox != null)
+            {
+                shellHitbox.isProjectile = true;
+                shellHitbox.ownerPlayerID = 0;
+                shellHitbox.isNormalAttack = false;
+            }
 
             // 見た目（小さいオレンジ色の弾）
             SpriteRenderer shellSr = shellObj.AddComponent<SpriteRenderer>();

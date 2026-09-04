@@ -35,9 +35,17 @@ namespace FightingGameBase
 
         private bool keysInitialized = false;
 
+        void Awake()
+        {
+            character = GetComponent<HammerCharacter>();
+        }
+
         void Start()
         {
-            // HammerCharacter 繧貞叙蠕励＠縺ｾ縺・            character = GetComponent<HammerCharacter>();
+            if (character == null)
+            {
+                character = GetComponent<HammerCharacter>();
+            }
         }
 
         private void InitializeKeys()

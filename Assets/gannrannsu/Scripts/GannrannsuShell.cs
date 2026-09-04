@@ -21,17 +21,30 @@ namespace FightingGameBase
         private float speed;          // 飛ぶスピード
         private int damage;           // この弾のダメージ
         private int ownerPlayerID;    // 誰が撃った弾か（自分に当たらないようにする）
+        private CharacterBase owner;  // 撃ったキャラクター本体
         private System.Action onHitCallback; // 弾が当たったときのコールバック
+
+        void Awake()
+        {
+            // 生成直後の誤判定を防ぐため、事前に飛び道具フラグを設定
+            Hitbox hitbox = GetComponent<Hitbox>();
+            if (hitbox != null)
+            {
+                hitbox.isProjectile = true;
+                hitbox.ownerPlayerID = 0;
+            }
+        }
 
         /// <summary>
         /// 弾を初期化するメソッド。GannrannsuCharacterから呼ばれます。
         /// </summary>
-        public void Initialize(float direction, float shellSpeed, int shellDamage, int playerID, System.Action onHit = null)
+        public void Initialize(float direction, float shellSpeed, int shellDamage, int playerID, CharacterBase ownerCharacter = null, System.Action onHit = null)
         {
             moveDirection = direction;
             speed = shellSpeed;
             damage = shellDamage;
             ownerPlayerID = playerID;
+            owner = ownerCharacter;
             onHitCallback = onHit;
 
             // 物理エンジンの設定（弾は重力で落ちないようにする）
@@ -43,9 +56,23 @@ namespace FightingGameBase
             BoxCollider2D col = GetComponent<BoxCollider2D>();
             col.isTrigger = true;
 
+            // 発射主（ガンランス）の全コライダーとの接触を物理レベルで無効化
+            if (owner != null)
+            {
+                Collider2D[] ownerCols = owner.GetComponentsInChildren<Collider2D>(true);
+                foreach (var oc in ownerCols)
+                {
+                    if (oc != null && oc != col)
+                    {
+                        Physics2D.IgnoreCollision(col, oc, true);
+                    }
+                }
+            }
+
             // Hitboxコンポーネントのセットアップ
             Hitbox hitbox = GetComponent<Hitbox>();
             hitbox.damage = damage;
+            hitbox.owner = owner;
             hitbox.ownerPlayerID = ownerPlayerID;
             hitbox.isNormalAttack = false;
             hitbox.isProjectile = true;

@@ -23,8 +23,21 @@ namespace FightingGameBase
         private int damage;
         private int ownerPlayerID;
         
+        private CharacterBase owner;
+        
         private LineRenderer trailRenderer;
         private System.Collections.Generic.List<Vector3> trailPositions = new System.Collections.Generic.List<Vector3>();
+
+        void Awake()
+        {
+            // 生成直後の誤判定を防ぐため、事前に飛び道具フラグを設定
+            Hitbox hitbox = GetComponent<Hitbox>();
+            if (hitbox != null)
+            {
+                hitbox.isProjectile = true;
+                hitbox.ownerPlayerID = 0;
+            }
+        }
 
         // ランタイムにアセットに依存せず真っ白なスプライトを動的生成するメソッド
         private static Sprite CreateDefaultSprite()
@@ -39,12 +52,13 @@ namespace FightingGameBase
         /// <summary>
         /// 竜撃砲の弾を初期化します。
         /// </summary>
-        public void Initialize(float direction, float projectileSpeed, int projectileDamage, int playerID)
+        public void Initialize(float direction, float projectileSpeed, int projectileDamage, int playerID, CharacterBase ownerCharacter = null)
         {
             moveDirection = direction;
             speed = projectileSpeed;
             damage = projectileDamage;
             ownerPlayerID = playerID;
+            owner = ownerCharacter;
 
             // 1. 物理（Rigidbody2D）の設定
             Rigidbody2D rb = GetComponent<Rigidbody2D>();
@@ -56,9 +70,23 @@ namespace FightingGameBase
             col.isTrigger = true;
             col.size = new Vector2(2.5f, 1.5f); // 巨大な竜撃砲の当たり判定サイズ
 
+            // 発射主（ガンランス）の全コライダーとの接触を物理レベルで無効化
+            if (owner != null)
+            {
+                Collider2D[] ownerCols = owner.GetComponentsInChildren<Collider2D>(true);
+                foreach (var oc in ownerCols)
+                {
+                    if (oc != null && oc != col)
+                    {
+                        Physics2D.IgnoreCollision(col, oc, true);
+                    }
+                }
+            }
+
             // Hitboxの設定
             Hitbox hitbox = GetComponent<Hitbox>();
             hitbox.damage = damage;
+            hitbox.owner = owner;
             hitbox.ownerPlayerID = ownerPlayerID;
             hitbox.isNormalAttack = false;
             hitbox.isProjectile = true;

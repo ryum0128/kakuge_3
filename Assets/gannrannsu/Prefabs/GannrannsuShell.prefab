@@ -122,10 +122,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FightingGameBase.Hitbox
   damage: 10
-  ownerPlayerID: 1
+  ownerPlayerID: 0
   postureDamageMultiplier: 1.5
-  isNormalAttack: 1
-  isProjectile: 0
+  isNormalAttack: 0
+  isProjectile: 1
   owner: {fileID: 0}
 --- !u!114 &8390868353009888691
 MonoBehaviour:

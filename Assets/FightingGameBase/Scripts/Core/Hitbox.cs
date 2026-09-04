@@ -85,6 +85,9 @@ namespace FightingGameBase
         // （Unity物理エンジンのタイミングによってOnTriggerEnter2Dが発火しないバグを防ぎます）
         public void CheckOverlap()
         {
+            // 飛び道具（弾）は生成位置で自身に即時ヒットすることを防ぐため、出現時の即時重なり判定は行いません
+            if (isProjectile) return;
+
             Collider2D col = GetComponent<Collider2D>();
             if (col == null || !col.enabled) return;
 
@@ -110,8 +113,19 @@ namespace FightingGameBase
             if (owner == null) owner = GetComponentInParent<CharacterBase>();
             if (owner != null) ownerPlayerID = owner.playerID;
 
-            if (hurtbox != null && hurtbox.owner != null && hurtbox.owner != owner && hurtbox.owner.playerID != ownerPlayerID)
+            // 持ち主が未設定かつownerPlayerIDが無効（0以下）な場合は判定しない
+            if (owner == null && ownerPlayerID <= 0) return;
+
+            // やられ判定の確認
+            if (hurtbox != null && hurtbox.owner != null)
             {
+                // 自分自身（持ち主）には絶対に当たらない
+                if (owner != null && hurtbox.owner == owner) return;
+
+                // 持ち主と同じプレイヤーID（味方や発射した本人）には当たらない
+                if (owner != null && hurtbox.owner.playerID == owner.playerID) return;
+                if (ownerPlayerID > 0 && hurtbox.owner.playerID == ownerPlayerID) return;
+
                 if (!hitCharacters.Contains(hurtbox.owner))
                 {
                     hitCharacters.Add(hurtbox.owner);

@@ -120,10 +120,19 @@ namespace FightingGameBase
             if (isCharging)
             {
                 // チャージ中は移動させないように速度を0にする
-                myRb.linearVelocity = new Vector2(0f, myRb.linearVelocity.y);
+                if (myRb != null)
+                {
+                    myRb.linearVelocity = new Vector2(0f, myRb.linearVelocity.y);
+                }
                 if (HasAnimator) myAnimator.SetFloat("Speed", 0f);
                 return;
             }
+
+            if (rb == null && myRb != null)
+            {
+                rb = myRb;
+            }
+
             base.Move(direction);
         }
 
@@ -165,6 +174,7 @@ namespace FightingGameBase
         void Awake()
         {
             myRb = GetComponent<Rigidbody2D>();
+            rb = myRb; // 基底クラスのrbも初期化
             myAnimator = GetComponentInChildren<Animator>();
 
             // ガンランスは浮いているので、重力を軽くします！
@@ -375,16 +385,20 @@ namespace FightingGameBase
             // 砲撃弾のプレハブが設定されていれば、弾を生成して飛ばします
             if (shellPrefab != null && firePoint != null)
             {
-                // 弾を作成します（位置はfirePoint、回転はなし）
-                GameObject shell = Instantiate(shellPrefab, firePoint.position, Quaternion.identity);
+                // キャラクターが向いている方向を取得します
+                float direction = Mathf.Sign(transform.localScale.x);
 
-                // 弾のスクリプトに設定を渡します
+                // 発射位置（ランス先端から少し前方にオフセットして自身の体との不要な接触を防ぐ）
+                Vector3 spawnPos = firePoint.position + new Vector3(direction * 0.2f, 0f, 0f);
+
+                // 弾を作成します
+                GameObject shell = Instantiate(shellPrefab, spawnPos, Quaternion.identity);
+
+                // 弾のスクリプトに設定を渡します（発射主 this を渡して自分自身への当たり判定を完全防止）
                 GannrannsuShell shellScript = shell.GetComponent<GannrannsuShell>();
                 if (shellScript != null)
                 {
-                    // キャラクターが向いている方向を取得します
-                    float direction = Mathf.Sign(transform.localScale.x);
-                    shellScript.Initialize(direction, shellSpeed, shellDamage, playerID);
+                    shellScript.Initialize(direction, shellSpeed, shellDamage, playerID, this);
                 }
             }
             else
@@ -415,16 +429,18 @@ namespace FightingGameBase
             // --- 竜撃砲の弾（とび道具）を生成して飛ばす ---
             GameObject projObj = new GameObject("DragonBlastProjectile");
             
-            // 発射位置の決定（firePointがあればそこ、無ければ自分の位置）
-            Vector3 spawnPos = firePoint != null ? firePoint.position : transform.position;
+            float direction = Mathf.Sign(transform.localScale.x);
+
+            // 発射位置の決定（firePointがあればそこから少し前方、無ければ自分の位置から少し前方）
+            Vector3 basePos = firePoint != null ? firePoint.position : transform.position;
+            Vector3 spawnPos = basePos + new Vector3(direction * 0.5f, 0f, 0f);
             projObj.transform.position = spawnPos;
 
-            // コンポーネントのアタッチと初期化
+            // コンポーネントのアタッチと初期化（発射主 this を渡して自分自身への当たり判定を完全防止）
             DragonBlastProjectile proj = projObj.AddComponent<DragonBlastProjectile>();
             
-            float direction = Mathf.Sign(transform.localScale.x);
             // 弾速は少し速めの 15f で飛んでいくようにします
-            proj.Initialize(direction, 15f, dragonBlastDamage, playerID);
+            proj.Initialize(direction, 15f, dragonBlastDamage, playerID, this);
 
             // --- 反動で後ろに吹っ飛びます ---
             float recoilDirection = -Mathf.Sign(transform.localScale.x);
