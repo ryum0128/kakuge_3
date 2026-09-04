@@ -119,6 +119,20 @@ namespace FightingGameBase
         {
             FindPlayers();
             CreateHUD();
+
+            // Auto-instantiate StunGaugeUI if missing in the scene
+            if (FindAnyObjectByType<StunGaugeUI>() == null)
+            {
+                GameObject stunGo = new GameObject("StunGaugeUI");
+                stunGo.AddComponent<StunGaugeUI>();
+            }
+
+            // Auto-instantiate WhipSkillGaugeUI if a whip character exists and UI is missing
+            if (FindAnyObjectByType<WhipCharacter>() != null && FindAnyObjectByType<WhipSkillGaugeUI>() == null)
+            {
+                GameObject whipGaugeGo = new GameObject("WhipSkillGaugeUI");
+                whipGaugeGo.AddComponent<WhipSkillGaugeUI>();
+            }
         }
 
         void OnDestroy()
@@ -130,6 +144,7 @@ namespace FightingGameBase
             if (p2PostureGradient != null) { Destroy(p2PostureGradient.texture); Destroy(p2PostureGradient); }
             if (p1ManaGradient != null) { Destroy(p1ManaGradient.texture); Destroy(p1ManaGradient); }
             if (p2ManaGradient != null) { Destroy(p2ManaGradient.texture); Destroy(p2ManaGradient); }
+            if (circleSprite != null) { Destroy(circleSprite.texture); Destroy(circleSprite); }
         }
 
         void FindPlayers()

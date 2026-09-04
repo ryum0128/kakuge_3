@@ -102,6 +102,7 @@ namespace FightingGameBase
         private Rigidbody2D myRb;
         private Animator myAnimator;
         private bool isHovering = true; // 浮遊しているかどうか
+        private bool HasAnimator => myAnimator != null && myAnimator.runtimeAnimatorController != null;
         private bool isAttacking = false; // 攻撃中かどうか
 
         private System.Collections.IEnumerator SetAttackingState(float duration)
@@ -120,7 +121,7 @@ namespace FightingGameBase
             {
                 // チャージ中は移動させないように速度を0にする
                 myRb.linearVelocity = new Vector2(0f, myRb.linearVelocity.y);
-                if (myAnimator != null) myAnimator.SetFloat("Speed", 0f);
+                if (HasAnimator) myAnimator.SetFloat("Speed", 0f);
                 return;
             }
             base.Move(direction);
@@ -139,7 +140,7 @@ namespace FightingGameBase
         {
             if (isDead) return;
             isCharging = true;
-            if (myAnimator != null) myAnimator.SetTrigger("StartCharge"); // アニメーション用トリガー
+            if (HasAnimator) myAnimator.SetTrigger("StartCharge"); // アニメーション用トリガー
             Debug.Log("ガンランス：竜撃砲チャージ開始！！エネルギー充填中...");
         }
 
@@ -147,7 +148,7 @@ namespace FightingGameBase
         {
             if (!isCharging || isDead) return;
             isCharging = false;
-            if (myAnimator != null) myAnimator.SetTrigger("CancelCharge");
+            if (HasAnimator) myAnimator.SetTrigger("CancelCharge");
             Debug.Log("ガンランス：チャージキャンセル");
         }
 
@@ -192,9 +193,23 @@ namespace FightingGameBase
         // Update() はガンランス固有の浮遊処理を行います。
         // ※ これにより CharacterBase.Update() は隠れますが、
         //    接地判定などの処理もここに含めているので大丈夫です。
+        public override void ResetActionStates()
+        {
+            base.ResetActionStates();
+            isAttacking = false;
+            if (isCharging)
+            {
+                CancelCharge();
+            }
+            chargeGauge = 0f;
+        }
+
         void Update()
         {
             if (isDead || GameManager.Instance != null && !GameManager.Instance.IsPlaying) return;
+
+            // Call base.Update to charge stun gauge and run basic updates
+            base.Update();
 
             // --- 浮遊処理 ---
             // 地面の近くまで落ちてきたら、上向きの力を加えて浮かせます
@@ -206,9 +221,8 @@ namespace FightingGameBase
             // 接地判定（CharacterBase.Update() の代わり）
             isGrounded = Mathf.Abs(myRb.linearVelocity.y) < 0.1f;
 
-            if (myAnimator != null)
+            if (HasAnimator)
             {
-                myAnimator.SetBool("IsGrounded", isGrounded);
                 myAnimator.SetBool("IsHovering", isHovering);
             }
 
@@ -331,7 +345,7 @@ namespace FightingGameBase
         {
             if (isDead || isAttacking) return;
 
-            if (myAnimator != null) myAnimator.SetTrigger("AttackNormal");
+            if (HasAnimator) myAnimator.SetTrigger("AttackNormal");
             Debug.Log("ガンランス：突き攻撃！");
 
             // 攻撃状態をセット (突き攻撃の硬直時間は 0.25 秒)
@@ -352,7 +366,7 @@ namespace FightingGameBase
         {
             if (isDead || isAttacking) return;
 
-            if (myAnimator != null) myAnimator.SetTrigger("AttackSpecial");
+            if (HasAnimator) myAnimator.SetTrigger("AttackSpecial");
             Debug.Log("ガンランス：砲撃発射！！");
 
             // 攻撃状態をセット (砲撃硬直時間は 0.35 秒)
@@ -392,7 +406,7 @@ namespace FightingGameBase
             // クールタイムタイマーを設定
             ultimateAttackCooldownTimer = ultimateAttackCooldown;
 
-            if (myAnimator != null) myAnimator.SetTrigger("AttackUltimate");
+            if (HasAnimator) myAnimator.SetTrigger("AttackUltimate");
             Debug.Log("ガンランス：竜撃砲発動！！！");
 
             // 攻撃状態をセット (竜撃砲の反動と硬直時間は 0.6 秒)

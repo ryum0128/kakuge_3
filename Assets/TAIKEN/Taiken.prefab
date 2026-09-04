@@ -343,6 +343,11 @@ MonoBehaviour:
   isGrounded: 0
   isDead: 0
   isStunned: 0
+  isInvincible: 0
+  isDashingOrEvading: 0
+  lastHurtTime: -10
+  stunChargeTime: 10
+  stunChargeGauge: 0
   maxPosture: 100
   currentPosture: 0
   postureRegenSpeed: 20
@@ -392,6 +397,8 @@ MonoBehaviour:
   normalAttackKey: 24
   specialAttackKey: 25
   blockKey: 22
+  dashKey: 26
+  stunAttackKey: 17
   simultaneousPressWindow: 0.05
 --- !u!1 &2820899828352926326
 GameObject:
@@ -486,6 +493,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FightingGameBase.Hitbox
   damage: 15
   ownerPlayerID: 1
+  postureDamageMultiplier: 1.5
+  isNormalAttack: 1
+  isProjectile: 0
+  owner: {fileID: 0}
 --- !u!1 &6838727873647340436
 GameObject:
   m_ObjectHideFlags: 0

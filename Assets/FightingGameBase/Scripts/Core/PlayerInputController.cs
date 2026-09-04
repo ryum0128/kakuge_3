@@ -34,43 +34,146 @@ namespace FightingGameBase
         private float lastSpecialAttackPressTime = -1f;
         private bool isUltimateTriggered = false; // 必殺技が出たかどうか
 
-        private bool keysInitialized = false;
 
         void Start()
         {
-            // 繧ｭ繝｣繝ｩ繧ｯ繧ｿ繝ｼ譛ｬ菴難ｼ，haracterBase繧定ｦ九▽縺代※蜿門ｾ励＠縺ｾ縺・            character = GetComponent<CharacterBase>();
+            // キャラクター本体（CharacterBase）を見つけて取得します
+            character = GetComponent<CharacterBase>();
+            InitializeInputsByPosition();
         }
 
-        private void InitializeKeys()
+        private void InitializeInputsByPosition()
         {
-            if (character != null && (character.playerID == 2 || name.Contains("P2") || name.Contains("RightSide") || name.Contains("Player2")))
+            PlayerInputController[] controllers = FindObjectsByType<PlayerInputController>(FindObjectsSortMode.None);
+
+            // Sort by X position to determine playerID and assign keys to all controllers in the scene
+            if (controllers.Length > 1)
             {
-                leftKey = Key.LeftArrow;
-                rightKey = Key.RightArrow;
-                jumpKey = Key.UpArrow;
-                normalAttackKey = Key.I;
-                specialAttackKey = Key.O;
-                blockKey = Key.U;
-                dashKey = Key.P;
-                stunAttackKey = Key.Y;
+                System.Array.Sort(controllers, (a, b) => a.transform.position.x.CompareTo(b.transform.position.x));
+                for (int i = 0; i < controllers.Length; i++)
+                {
+                    var ctrl = controllers[i];
+                    var charBase = ctrl.GetComponent<CharacterBase>();
+                    if (charBase != null)
+                    {
+                        charBase.playerID = i + 1;
+                    }
+
+                    if (i == 0) // Player 1
+                    {
+                        ctrl.leftKey = Key.A;
+                        ctrl.rightKey = Key.D;
+                        ctrl.jumpKey = Key.Space;
+                        ctrl.normalAttackKey = Key.J;
+                        ctrl.specialAttackKey = Key.K;
+                        ctrl.blockKey = Key.H;
+                        ctrl.dashKey = Key.L;
+                        ctrl.stunAttackKey = Key.C;
+                    }
+                    else if (i == 1) // Player 2
+                    {
+                        ctrl.leftKey = Key.LeftArrow;
+                        ctrl.rightKey = Key.RightArrow;
+                        ctrl.jumpKey = Key.UpArrow;
+                        ctrl.normalAttackKey = Key.Numpad1;
+                        ctrl.specialAttackKey = Key.Numpad2;
+                        ctrl.blockKey = Key.Numpad3;
+                        ctrl.dashKey = Key.Numpad5;
+                        ctrl.stunAttackKey = Key.Numpad0;
+                    }
+                }
             }
-            keysInitialized = true;
+            else
+            {
+                // Fallback for single controller setup
+                if (character != null)
+                {
+                    if (character.playerID == 1)
+                    {
+                        leftKey = Key.A;
+                        rightKey = Key.D;
+                        jumpKey = Key.Space;
+                        normalAttackKey = Key.J;
+                        specialAttackKey = Key.K;
+                        blockKey = Key.H;
+                        dashKey = Key.L;
+                        stunAttackKey = Key.C;
+                    }
+                    else if (character.playerID == 2)
+                    {
+                        leftKey = Key.LeftArrow;
+                        rightKey = Key.RightArrow;
+                        jumpKey = Key.UpArrow;
+                        normalAttackKey = Key.Numpad1;
+                        specialAttackKey = Key.Numpad2;
+                        blockKey = Key.Numpad3;
+                        dashKey = Key.Numpad5;
+                        stunAttackKey = Key.Numpad0;
+                    }
+                }
+            }
+        }
+
+        private bool IsKeyPressed(Key key)
+        {
+            if (Keyboard.current == null) return false;
+
+            // If checking a key for Player 2, allow non-Numpad fallbacks
+            if (character != null && character.playerID == 2)
+            {
+                if (key == Key.Numpad1 && Keyboard.current[Key.U].isPressed) return true;
+                if (key == Key.Numpad2 && Keyboard.current[Key.I].isPressed) return true;
+                if (key == Key.Numpad3 && Keyboard.current[Key.O].isPressed) return true;
+                if (key == Key.Numpad5 && Keyboard.current[Key.P].isPressed) return true;
+                if (key == Key.Numpad0 && Keyboard.current[Key.Y].isPressed) return true;
+            }
+
+            return Keyboard.current[key].isPressed;
+        }
+
+        private bool WasKeyPressedThisFrame(Key key)
+        {
+            if (Keyboard.current == null) return false;
+
+            if (character != null && character.playerID == 2)
+            {
+                if (key == Key.Numpad1 && Keyboard.current[Key.U].wasPressedThisFrame) return true;
+                if (key == Key.Numpad2 && Keyboard.current[Key.I].wasPressedThisFrame) return true;
+                if (key == Key.Numpad3 && Keyboard.current[Key.O].wasPressedThisFrame) return true;
+                if (key == Key.Numpad5 && Keyboard.current[Key.P].wasPressedThisFrame) return true;
+                if (key == Key.Numpad0 && Keyboard.current[Key.Y].wasPressedThisFrame) return true;
+            }
+
+            return Keyboard.current[key].wasPressedThisFrame;
+        }
+
+        private bool WasKeyReleasedThisFrame(Key key)
+        {
+            if (Keyboard.current == null) return false;
+
+            if (character != null && character.playerID == 2)
+            {
+                if (key == Key.Numpad1 && Keyboard.current[Key.U].wasReleasedThisFrame) return true;
+                if (key == Key.Numpad2 && Keyboard.current[Key.I].wasReleasedThisFrame) return true;
+                if (key == Key.Numpad3 && Keyboard.current[Key.O].wasReleasedThisFrame) return true;
+                if (key == Key.Numpad5 && Keyboard.current[Key.P].wasReleasedThisFrame) return true;
+                if (key == Key.Numpad0 && Keyboard.current[Key.Y].wasReleasedThisFrame) return true;
+            }
+
+            return Keyboard.current[key].wasReleasedThisFrame;
         }
 
         void Update()
         {
-            if (!keysInitialized)
-            {
-                InitializeKeys();
-            }
-
             // キャラクターがいない、または倒れている場合、スタン中、被弾反動(IsHurtLocked)中は入力を受け付けません
             if (character == null || character.isDead || character.isStunned || character.IsHurtLocked) return;
-            
-            // 繧ｭ繝ｼ繝懊・繝峨′謗･邯壹＆繧後※縺・↑縺・ｴ蜷医ｂ菴輔ｂ縺励∪縺帙ｓ
+
+            // キーボードが接続されていない場合も何もしません
             if (Keyboard.current == null) return;
 
-            // 遘ｻ蜍輔・蜃ｦ逅・∵判謦・・蜃ｦ逅・◎繧後◇繧悟他縺ｳ蜃ｺ縺励∪縺・            HandleMovement();
+            // 移動の処理と、攻撃の処理をそれぞれ呼び出します
+            HandleMovement();
+            if (character.IsAttacking) return;
             HandleAttacks();
             HandleBlock();
         }
@@ -83,20 +186,23 @@ namespace FightingGameBase
             float direction = 0f;
             
             // 左キーが押されていれば -1 に、右キーが押されていれば +1 にします
-            if (Keyboard.current[leftKey].isPressed) direction -= 1f;
-            if (Keyboard.current[rightKey].isPressed) direction += 1f;
+            if (IsKeyPressed(leftKey)) direction -= 1f;
+            if (IsKeyPressed(rightKey)) direction += 1f;
 
             // キャラクター本体に「この方向に移動して！」と命令します
             character.Move(direction);
 
+            // 攻撁E中ならダッシュやジャンプは制限しまぁE
+            if (character.IsAttacking) return;
+
             // ダッシュ・回避キー判定
-            if (Keyboard.current[dashKey].wasPressedThisFrame)
+            if (WasKeyPressedThisFrame(dashKey))
             {
                 character.TriggerDashOrEvade(direction);
             }
 
             // ジャンプキーが「押された瞬間（wasPressedThisFrame）」ならジャンプします
-            if (Keyboard.current[jumpKey].wasPressedThisFrame)
+            if (WasKeyPressedThisFrame(jumpKey))
             {
                 character.Jump();
             }
@@ -108,8 +214,8 @@ namespace FightingGameBase
         private void HandleAttacks()
         {
             // キーが「押された瞬間」かどうかをチェックします
-            bool normalAttackDown = Keyboard.current[normalAttackKey].wasPressedThisFrame;
-            bool specialAttackDown = Keyboard.current[specialAttackKey].wasPressedThisFrame;
+            bool normalAttackDown = WasKeyPressedThisFrame(normalAttackKey);
+            bool specialAttackDown = WasKeyPressedThisFrame(specialAttackKey);
 
             // 押されたら、その時のゲーム内時間を記録しておきます
             if (normalAttackDown) lastNormalAttackPressTime = Time.time;
@@ -160,13 +266,13 @@ namespace FightingGameBase
             }
             
             // キーを「離した瞬間」にロックを解除して、また必殺技を出せるようにします
-            if (Keyboard.current[normalAttackKey].wasReleasedThisFrame || Keyboard.current[specialAttackKey].wasReleasedThisFrame)
+            if (WasKeyReleasedThisFrame(normalAttackKey) || WasKeyReleasedThisFrame(specialAttackKey))
             {
                 isUltimateTriggered = false;
             }
 
             // --- スタンスキル (C) ---
-            if (Keyboard.current[stunAttackKey].wasPressedThisFrame)
+            if (WasKeyPressedThisFrame(stunAttackKey))
             {
                 character.AttackStun();
             }
@@ -178,12 +284,12 @@ namespace FightingGameBase
         private void HandleBlock()
         {
             // Hキーを押した瞬間 → StartBlock（パリー窓を開く）
-            if (Keyboard.current[blockKey].wasPressedThisFrame)
+            if (WasKeyPressedThisFrame(blockKey))
             {
                 character.StartBlock();
             }
             // Hキーを離した瞬間 → StopBlock（ブロック解除）
-            if (Keyboard.current[blockKey].wasReleasedThisFrame)
+            if (WasKeyReleasedThisFrame(blockKey))
             {
                 character.StopBlock();
             }

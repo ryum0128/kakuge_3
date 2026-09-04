@@ -17,6 +17,11 @@ namespace FightingGameBase
         public Hitbox counterHitbox;
         
         private Coroutine currentSwingCoroutine;
+        private bool isSwinging = false;
+        public override bool IsAttacking => isSwinging;
+        public override bool CanUseStunSkill => true; // ライトセーバーのみスタンスキル使用可能
+        private bool isCounterStance = false;
+        private SpriteRenderer spriteRenderer;
         private TrailRenderer trailRenderer;
         private Animator anim;
 
@@ -25,6 +30,12 @@ namespace FightingGameBase
             // 残像用 TrailRenderer や Animator が子オブジェクト（Visuals 等）にあれば自動取得
             trailRenderer = GetComponentInChildren<TrailRenderer>(true);
             anim = GetComponentInChildren<Animator>();
+        }
+
+        protected override void Start()
+        {
+            base.Start();
+            spriteRenderer = GetComponentInChildren<SpriteRenderer>();
         }
         
         // =========================================================
@@ -38,21 +49,23 @@ namespace FightingGameBase
         {
             base.AttackNormal(); // 本来の攻撃判定・SE発生処理
 
-            // 1. Animator（.animアニメーションクリップ）がセットされている場合はアニメーター再生
+            // 1. Animator（.animアニメーションクリップ）がセットされている場合はアニメーター優先で再生
             if (anim != null && anim.runtimeAnimatorController != null)
             {
                 anim.SetTrigger("AttackNormal");
             }
-
-            // 2. プログラム（コルーチン）による動的補間アニメーションも実行
-            Transform visuals = transform.Find("Visuals");
-            if (visuals != null)
+            else
             {
-                if (currentSwingCoroutine != null)
+                // 2. Animatorがセットされていない場合はプログラム（コルーチン）でスムーズに振り下ろしを表現
+                Transform visuals = transform.Find("Visuals");
+                if (visuals != null)
                 {
-                    StopCoroutine(currentSwingCoroutine);
+                    if (currentSwingCoroutine != null)
+                    {
+                        StopCoroutine(currentSwingCoroutine);
+                    }
+                    currentSwingCoroutine = StartCoroutine(OverheadSlashAnimation(visuals, 0.32f));
                 }
-                currentSwingCoroutine = StartCoroutine(OverheadSlashAnimation(visuals, 0.32f));
             }
         }
 
@@ -67,15 +80,17 @@ namespace FightingGameBase
             {
                 anim.SetTrigger("AttackSpecial");
             }
-
-            Transform visuals = transform.Find("Visuals");
-            if (visuals != null)
+            else
             {
-                if (currentSwingCoroutine != null)
+                Transform visuals = transform.Find("Visuals");
+                if (visuals != null)
                 {
-                    StopCoroutine(currentSwingCoroutine);
+                    if (currentSwingCoroutine != null)
+                    {
+                        StopCoroutine(currentSwingCoroutine);
+                    }
+                    currentSwingCoroutine = StartCoroutine(HeavySlamAnimation(visuals, 0.45f));
                 }
-                currentSwingCoroutine = StartCoroutine(HeavySlamAnimation(visuals, 0.45f));
             }
         }
 
@@ -90,15 +105,17 @@ namespace FightingGameBase
             {
                 anim.SetTrigger("AttackUltimate");
             }
-
-            Transform visuals = transform.Find("Visuals");
-            if (visuals != null)
+            else
             {
-                if (currentSwingCoroutine != null)
+                Transform visuals = transform.Find("Visuals");
+                if (visuals != null)
                 {
-                    StopCoroutine(currentSwingCoroutine);
+                    if (currentSwingCoroutine != null)
+                    {
+                        StopCoroutine(currentSwingCoroutine);
+                    }
+                    currentSwingCoroutine = StartCoroutine(TripleSlashAnimation(visuals, 0.6f));
                 }
-                currentSwingCoroutine = StartCoroutine(TripleSlashAnimation(visuals, 0.6f));
             }
         }
 
@@ -112,11 +129,12 @@ namespace FightingGameBase
         /// </summary>
         private IEnumerator OverheadSlashAnimation(Transform visuals, float duration)
         {
+            isSwinging = true;
             Vector3 originalPos = Vector3.zero;
             Quaternion originalRot = Quaternion.identity;
 
             // 左右どちらを向いていても正しく前方に振り下ろすための向き係数
-            float facing = transform.localScale.x < 0 ? -1f : 1f;
+            float facing = 1f;
 
             // 各フェーズの目標設定
             // フェーズ1: 振りかぶり (後ろ上方にためる)
@@ -192,6 +210,7 @@ namespace FightingGameBase
 
             visuals.localRotation = originalRot;
             visuals.localPosition = originalPos;
+            isSwinging = false;
             currentSwingCoroutine = null;
         }
 
@@ -201,9 +220,10 @@ namespace FightingGameBase
         /// </summary>
         private IEnumerator HeavySlamAnimation(Transform visuals, float duration)
         {
+            isSwinging = true;
             Vector3 originalPos = Vector3.zero;
             Quaternion originalRot = Quaternion.identity;
-            float facing = transform.localScale.x < 0 ? -1f : 1f;
+            float facing = 1f;
 
             // 大きなため動作
             Quaternion windupRot = Quaternion.Euler(0, 0, 45f * facing);
@@ -263,6 +283,7 @@ namespace FightingGameBase
 
             visuals.localRotation = originalRot;
             visuals.localPosition = originalPos;
+            isSwinging = false;
             currentSwingCoroutine = null;
         }
 
@@ -272,9 +293,10 @@ namespace FightingGameBase
         /// </summary>
         private IEnumerator TripleSlashAnimation(Transform visuals, float duration)
         {
+            isSwinging = true;
             Vector3 originalPos = Vector3.zero;
             Quaternion originalRot = Quaternion.identity;
-            float facing = transform.localScale.x < 0 ? -1f : 1f;
+            float facing = 1f;
 
             float stepDuration = duration / 3.0f;
             SetTrailActive(true);
@@ -306,6 +328,7 @@ namespace FightingGameBase
 
             visuals.localRotation = originalRot;
             visuals.localPosition = originalPos;
+            isSwinging = false;
             currentSwingCoroutine = null;
         }
 
@@ -328,7 +351,142 @@ namespace FightingGameBase
                 trailRenderer.emitting = active;
             }
         }
+
+
+        public override void ResetActionStates()
+        {
+            base.ResetActionStates();
+            isSwinging = false;
+            isCounterStance = false;
+            if (spriteRenderer != null && spriteNormal != null)
+            {
+                spriteRenderer.sprite = spriteNormal;
+            }
+            if (counterHitbox != null)
+            {
+                counterHitbox.gameObject.SetActive(false);
+            }
+        }
+
+        public override void StartBlock()
+        {
+            if (isDead || isSwinging || isStunned) return;
+            StartCoroutine(CounterStanceRoutine());
+        }
+
+        public override void StopBlock()
+        {
+            isCounterStance = false;
+        }
+
+        private IEnumerator CounterStanceRoutine()
+        {
+            isCounterStance = true;
+            isSwinging = true;
+
+            if (spriteRenderer != null && spriteCounterStance != null)
+            {
+                spriteRenderer.sprite = spriteCounterStance;
+            }
+
+            float duration = 0.4f;
+            float elapsed = 0f;
+            while (elapsed < duration && isCounterStance)
+            {
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            if (isCounterStance)
+            {
+                isCounterStance = false;
+                if (spriteRenderer != null && spriteNormal != null)
+                {
+                    spriteRenderer.sprite = spriteNormal;
+                }
+                isSwinging = false;
+            }
+        }
+
+        private void TriggerCounterAttack(int incomingDamage, Hitbox attackerHitbox)
+        {
+            isCounterStance = false;
+            StopAllCoroutines();
+            StartCoroutine(CounterAttackRoutine(incomingDamage, attackerHitbox));
+        }
+
+        private IEnumerator CounterAttackRoutine(int incomingDamage, Hitbox attackerHitbox)
+        {
+            isSwinging = true;
+
+            if (spriteRenderer != null && spriteCounterFlash != null)
+            {
+                spriteRenderer.sprite = spriteCounterFlash;
+            }
+            yield return new WaitForSeconds(0.1f);
+
+            if (spriteRenderer != null && spriteCounterAttack != null)
+            {
+                spriteRenderer.sprite = spriteCounterAttack;
+            }
+
+            int counterDamage = incomingDamage * 2;
+            if (counterHitbox != null)
+            {
+                counterHitbox.damage = counterDamage;
+                counterHitbox.owner = this;
+                counterHitbox.ownerPlayerID = playerID;
+                counterHitbox.gameObject.SetActive(true);
+            }
+
+            float facingDir = transform.localScale.x;
+            Vector2 startPos = transform.position;
+            float strikeDuration = 0.25f;
+            float elapsed = 0f;
+            while (elapsed < strikeDuration)
+            {
+                elapsed += Time.deltaTime;
+                rb.linearVelocity = new Vector2(facingDir * 6f, rb.linearVelocity.y);
+                yield return null;
+            }
+            rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+
+            if (counterHitbox != null)
+            {
+                counterHitbox.gameObject.SetActive(false);
+            }
+
+            yield return new WaitForSeconds(0.15f);
+
+            if (spriteRenderer != null && spriteNormal != null)
+            {
+                spriteRenderer.sprite = spriteNormal;
+            }
+
+            isSwinging = false;
+        }
+
+        public override void TakeDamage(int damage, Hitbox attackerHitbox = null)
+        {
+            if (isCounterStance)
+            {
+                TriggerCounterAttack(damage, attackerHitbox);
+                return;
+            }
+
+            // If the attack is a projectile and HP is 90% or higher, negate it!
+            if (attackerHitbox != null && attackerHitbox.isProjectile)
+            {
+                float healthPercent = (float)currentHP / maxHP;
+                if (healthPercent >= 0.9f)
+                {
+                    Debug.Log("Lightsaber negated projectile damage (HP >= 90%).");
+                    return; // Ignore damage entirely!
+                }
+            }
+
+            base.TakeDamage(damage, attackerHitbox);
+        }
     }
 }
-
 

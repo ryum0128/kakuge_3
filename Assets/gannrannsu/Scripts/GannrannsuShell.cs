@@ -62,8 +62,16 @@ namespace FightingGameBase
             transform.localScale = new Vector3(moveDirection, 1f, 1f);
 
             // 一定時間後に自動で消す（画面外に飛んでいっても安心！）
+            Hitbox hb = gameObject.AddComponent<Hitbox>();
+            hb.damage = damage;
+            hb.ownerPlayerID = ownerPlayerID;
+            hb.isProjectile = true;
+            hb.isNormalAttack = false;
+
             Destroy(gameObject, lifetime);
         }
+
+        // 衝突判定はHitboxコンポーネントで一元管理されるため、OnTriggerEnter2Dは不要になります。
 
 #if UNITY_EDITOR
         // シーン画面で弾を見やすくするための表示（オレンジ色の丸）
