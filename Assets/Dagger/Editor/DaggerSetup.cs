@@ -111,10 +111,19 @@ namespace FightingGameBase.Editor
             weapon.transform.localPosition = new Vector3(0.7f, 0.5f, 0f);
 
             SpriteRenderer weaponSr = weapon.AddComponent<SpriteRenderer>();
-            weaponSr.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
-            weaponSr.drawMode = SpriteDrawMode.Sliced; // Slicedモードを使用して正確なサイズを設定
-            weaponSr.size = new Vector2(1.4f, 0.6f); // 当たり判定（PunchHitboxのBoxCollider2D）と同じサイズに設定
-            weaponSr.color = new Color(0.7f, 0.7f, 0.7f, 1f); // 少しグレーに設定
+            if (daggerSprite != null)
+            {
+                weaponSr.sprite = daggerSprite;
+                weaponSr.drawMode = SpriteDrawMode.Simple;
+                weaponSr.color = Color.white;
+            }
+            else
+            {
+                weaponSr.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+                weaponSr.drawMode = SpriteDrawMode.Sliced;
+                weaponSr.size = new Vector2(1.4f, 0.6f); // 当たり判定（PunchHitboxのBoxCollider2D）と同じサイズに設定
+                weaponSr.color = new Color(0.7f, 0.7f, 0.7f, 1f); // 少しグレーに設定
+            }
             weaponSr.sortingOrder = 5; // キャラクターの手前に表示
 
             visuals.AddComponent<Animator>();

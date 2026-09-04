@@ -10,6 +10,7 @@ namespace FightingGameBase
     // =================================================================================
     [RequireComponent(typeof(Rigidbody2D))]
     [RequireComponent(typeof(BoxCollider2D))]
+    [RequireComponent(typeof(Hitbox))]
     public class GannrannsuShell : MonoBehaviour
     {
         [Tooltip("弾が自動的に消えるまでの時間（秒）")]
@@ -42,32 +43,26 @@ namespace FightingGameBase
             BoxCollider2D col = GetComponent<BoxCollider2D>();
             col.isTrigger = true;
 
+            // Hitboxコンポーネントのセットアップ
+            Hitbox hitbox = GetComponent<Hitbox>();
+            hitbox.damage = damage;
+            hitbox.ownerPlayerID = ownerPlayerID;
+            hitbox.isNormalAttack = false;
+            hitbox.isProjectile = true;
+
+            // 命中時のコールバックを登録して弾を消滅させる
+            hitbox.OnHitLanded = (hurtbox, dmg) =>
+            {
+                Debug.Log($"砲撃弾が命中！{dmg}ダメージ！");
+                onHitCallback?.Invoke();
+                Destroy(gameObject);
+            };
+
             // 弾の向きを飛ぶ方向に合わせる
             transform.localScale = new Vector3(moveDirection, 1f, 1f);
 
             // 一定時間後に自動で消す（画面外に飛んでいっても安心！）
             Destroy(gameObject, lifetime);
-        }
-
-        // 何かに触れた瞬間に呼ばれます
-        private void OnTriggerEnter2D(Collider2D other)
-        {
-            // 相手のやられ判定（Hurtbox）を探します
-            Hurtbox hurtbox = other.GetComponent<Hurtbox>();
-
-            // 相手がHurtboxを持っていて、自分以外のキャラクターなら…
-            if (hurtbox != null && hurtbox.owner != null && hurtbox.owner.playerID != ownerPlayerID)
-            {
-                // ダメージを与えます！
-                hurtbox.TakeDamage(damage);
-                Debug.Log($"砲撃弾が命中！{damage}ダメージ！");
-
-                // コールバックを呼び出します
-                onHitCallback?.Invoke();
-
-                // 弾は当たったら消えます
-                Destroy(gameObject);
-            }
         }
 
 #if UNITY_EDITOR

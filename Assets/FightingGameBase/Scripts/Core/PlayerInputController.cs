@@ -34,22 +34,43 @@ namespace FightingGameBase
         private float lastSpecialAttackPressTime = -1f;
         private bool isUltimateTriggered = false; // 必殺技が出たかどうか
 
+        private bool keysInitialized = false;
+
         void Start()
         {
-            // キャラクター本体（CharacterBase）を見つけて取得します
-            character = GetComponent<CharacterBase>();
+            // 繧ｭ繝｣繝ｩ繧ｯ繧ｿ繝ｼ譛ｬ菴難ｼ，haracterBase繧定ｦ九▽縺代※蜿門ｾ励＠縺ｾ縺・            character = GetComponent<CharacterBase>();
+        }
+
+        private void InitializeKeys()
+        {
+            if (character != null && (character.playerID == 2 || name.Contains("P2") || name.Contains("RightSide") || name.Contains("Player2")))
+            {
+                leftKey = Key.LeftArrow;
+                rightKey = Key.RightArrow;
+                jumpKey = Key.UpArrow;
+                normalAttackKey = Key.I;
+                specialAttackKey = Key.O;
+                blockKey = Key.U;
+                dashKey = Key.P;
+                stunAttackKey = Key.Y;
+            }
+            keysInitialized = true;
         }
 
         void Update()
         {
-            // キャラクターがいない、または倒れている場合、スタン中、被弾反動（IsHurtLocked）中は入力を受け付けません
+            if (!keysInitialized)
+            {
+                InitializeKeys();
+            }
+
+            // キャラクターがいない、または倒れている場合、スタン中、被弾反動(IsHurtLocked)中は入力を受け付けません
             if (character == null || character.isDead || character.isStunned || character.IsHurtLocked) return;
             
-            // キーボードが接続されていない場合も何もしません
+            // 繧ｭ繝ｼ繝懊・繝峨′謗･邯壹＆繧後※縺・↑縺・ｴ蜷医ｂ菴輔ｂ縺励∪縺帙ｓ
             if (Keyboard.current == null) return;
 
-            // 移動の処理と、攻撃の処理をそれぞれ呼び出します
-            HandleMovement();
+            // 遘ｻ蜍輔・蜃ｦ逅・∵判謦・・蜃ｦ逅・◎繧後◇繧悟他縺ｳ蜃ｺ縺励∪縺・            HandleMovement();
             HandleAttacks();
             HandleBlock();
         }

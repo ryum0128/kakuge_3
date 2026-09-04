@@ -39,14 +39,33 @@ namespace FightingGameBase
         private bool isUltimateTriggered = false;
         private float chargeTimer = 0f; // ★チャージ時間の計測用
 
+        private bool keysInitialized = false;
+
         void Start()
         {
-            // GannrannsuCharacter を取得します
-            character = GetComponent<GannrannsuCharacter>();
+            // GannrannsuCharacter 繧貞叙蠕励＠縺ｾ縺・            character = GetComponent<GannrannsuCharacter>();
+        }
+
+        private void InitializeKeys()
+        {
+            if (character != null && (character.playerID == 2 || name.Contains("P2") || name.Contains("RightSide") || name.Contains("Player2")))
+            {
+                leftKey = Key.LeftArrow;
+                rightKey = Key.RightArrow;
+                jumpKey = Key.UpArrow;
+                normalAttackKey = Key.I;
+                specialAttackKey = Key.O;
+            }
+            keysInitialized = true;
         }
 
         void Update()
         {
+            if (!keysInitialized)
+            {
+                InitializeKeys();
+            }
+
             if (character == null || character.isDead) return;
             if (Keyboard.current == null) return;
 

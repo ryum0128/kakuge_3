@@ -119,9 +119,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FightingGameBase.HammerCharacter
   stats: {fileID: 11400000, guid: 70978b240c003e148826c1779d379610, type: 2}
   playerID: 1
+  maxHP: 100
   currentHP: 0
   isGrounded: 0
   isDead: 0
+  isStunned: 0
+  isInvincible: 0
+  isDashingOrEvading: 0
+  lastHurtTime: -10
+  stunChargeTime: 10
+  stunChargeGauge: 0
+  maxPosture: 100
+  currentPosture: 0
+  postureRegenSpeed: 20
+  maxMana: 100
+  currentMana: 50
+  manaRegenSpeed: 8
+  isBlockingState: 0
   normalAttackDamage: 18
   specialAttackDamage: 28
   ultimateAttackDamage: 55
@@ -259,6 +273,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FightingGameBase.Hitbox
   damage: 28
   ownerPlayerID: 1
+  postureDamageMultiplier: 1.5
+  isNormalAttack: 1
+  isProjectile: 0
+  owner: {fileID: 0}
 --- !u!1 &6877054261312065606
 GameObject:
   m_ObjectHideFlags: 0
@@ -466,6 +484,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FightingGameBase.Hitbox
   damage: 18
   ownerPlayerID: 1
+  postureDamageMultiplier: 1.5
+  isNormalAttack: 1
+  isProjectile: 0
+  owner: {fileID: 0}
 --- !u!1 &8549996448165743833
 GameObject:
   m_ObjectHideFlags: 0
@@ -559,6 +581,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FightingGameBase.Hitbox
   damage: 55
   ownerPlayerID: 1
+  postureDamageMultiplier: 1.5
+  isNormalAttack: 1
+  isProjectile: 0
+  owner: {fileID: 0}
 --- !u!1 &9212030495786690736
 GameObject:
   m_ObjectHideFlags: 0
@@ -652,3 +678,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FightingGameBase.Hitbox
   damage: 28
   ownerPlayerID: 1
+  postureDamageMultiplier: 1.5
+  isNormalAttack: 1
+  isProjectile: 0
+  owner: {fileID: 0}

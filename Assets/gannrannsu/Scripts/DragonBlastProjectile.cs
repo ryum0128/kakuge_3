@@ -12,6 +12,7 @@ namespace FightingGameBase
     // =================================================================================
     [RequireComponent(typeof(Rigidbody2D))]
     [RequireComponent(typeof(BoxCollider2D))]
+    [RequireComponent(typeof(Hitbox))]
     public class DragonBlastProjectile : MonoBehaviour
     {
         [Tooltip("弾が自動的に消えるまでの時間（秒）")]
@@ -54,6 +55,21 @@ namespace FightingGameBase
             BoxCollider2D col = GetComponent<BoxCollider2D>();
             col.isTrigger = true;
             col.size = new Vector2(2.5f, 1.5f); // 巨大な竜撃砲の当たり判定サイズ
+
+            // Hitboxの設定
+            Hitbox hitbox = GetComponent<Hitbox>();
+            hitbox.damage = damage;
+            hitbox.ownerPlayerID = ownerPlayerID;
+            hitbox.isNormalAttack = false;
+            hitbox.isProjectile = true;
+
+            // 命中時に爆発エフェクトを発生させ、弾本体を消滅させる
+            hitbox.OnHitLanded = (hurtbox, dmg) =>
+            {
+                Debug.Log($"【命中】竜撃砲が対戦相手に直撃！ {dmg} ダメージ！");
+                CreateExplosionEffect();
+                Destroy(gameObject);
+            };
 
             // 3. 向きの設定
             transform.localScale = new Vector3(moveDirection, 1f, 1f);
@@ -148,22 +164,7 @@ namespace FightingGameBase
             }
         }
 
-        private void OnTriggerEnter2D(Collider2D other)
-        {
-            Hurtbox hurtbox = other.GetComponent<Hurtbox>();
-            if (hurtbox != null && hurtbox.owner != null && hurtbox.owner.playerID != ownerPlayerID)
-            {
-                // 大ダメージを与える！
-                hurtbox.TakeDamage(damage);
-                Debug.Log($"【命中】竜撃砲が対戦相手に直撃！ {damage} ダメージ！");
-
-                // 爆発エフェクトをその場に展開
-                CreateExplosionEffect();
-
-                // 弾本体は消滅
-                Destroy(gameObject);
-            }
-        }
+        // 衝突判定はHitboxコンポーネントで一元管理されるため、OnTriggerEnter2Dは不要になります。
 
         private void CreateExplosionEffect()
         {

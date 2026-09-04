@@ -67,7 +67,26 @@ namespace FightingGameBase
         protected virtual void Start()
         {
             rb = GetComponent<Rigidbody2D>();
-            rb.mass = 1000f; // Prevent characters from easily pushing each other like lightweight blocks
+            rb.mass = 1000f;
+            
+            // Determine playerID dynamically based on position (Left = 1P, Right = 2P)
+            var allChars = FindObjectsByType<CharacterBase>(FindObjectsSortMode.None);
+            if (allChars.Length == 2)
+            {
+                System.Array.Sort(allChars, (a, b) => a.transform.position.x.CompareTo(b.transform.position.x));
+                playerID = (this == allChars[0]) ? 1 : 2;
+            }
+            else
+            {
+                if (name.Contains("P2") || name.Contains("RightSide") || name.Contains("Player2") || name.Contains("(1)"))
+                {
+                    playerID = 2;
+                }
+                else if (name.Contains("P1") || name.Contains("LeftSide") || name.Contains("Player1"))
+                {
+                    playerID = 1;
+                }
+            } // Prevent characters from easily pushing each other like lightweight blocks
             animator = GetComponentInChildren<Animator>();
             if (animator != null && animator.runtimeAnimatorController == null)
             {
@@ -161,7 +180,7 @@ namespace FightingGameBase
             SafeSetFloat("Speed", Mathf.Abs(direction));
         }
 
-        public void Jump()
+        public virtual void Jump()
         {
             if (isDead || !isGrounded || isStunned) return;
 
