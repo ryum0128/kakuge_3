@@ -486,10 +486,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: Lightsaber_P1_LeftSide
       objectReference: {fileID: 0}
-    - target: {fileID: 7990396500539489036, guid: 28d55132866e8dd46a723662da8a9882, type: 3}
-      propertyPath: m_Sprite
-      value: 
-      objectReference: {fileID: -8333996685629492970, guid: b2f9eeefa9b06aa45ad943eedb2c8b7a, type: 3}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
