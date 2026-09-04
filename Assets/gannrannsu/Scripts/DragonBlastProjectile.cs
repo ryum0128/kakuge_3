@@ -96,12 +96,6 @@ namespace FightingGameBase
             CreateTrail();
 
             // 7. 自動消滅タイマー
-            Hitbox hb = gameObject.AddComponent<Hitbox>();
-            hb.damage = damage;
-            hb.ownerPlayerID = ownerPlayerID;
-            hb.isProjectile = true;
-            hb.isNormalAttack = false;
-
             Destroy(gameObject, lifetime);
         }
 
