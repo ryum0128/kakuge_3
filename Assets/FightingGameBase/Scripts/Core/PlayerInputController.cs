@@ -42,8 +42,49 @@ namespace FightingGameBase
             InitializeInputsByPosition();
         }
 
+        public void SetupKeys(int targetPlayerID)
+        {
+            if (character == null) character = GetComponent<CharacterBase>();
+            if (character != null) character.playerID = targetPlayerID;
+
+            if (targetPlayerID == 1)
+            {
+                leftKey = Key.A;
+                rightKey = Key.D;
+                jumpKey = Key.Space;
+                normalAttackKey = Key.J;
+                specialAttackKey = Key.K;
+                blockKey = Key.H;
+                dashKey = Key.L;
+                stunAttackKey = Key.C;
+            }
+            else
+            {
+                leftKey = Key.LeftArrow;
+                rightKey = Key.RightArrow;
+                jumpKey = Key.UpArrow;
+                normalAttackKey = Key.Numpad1;
+                specialAttackKey = Key.Numpad2;
+                blockKey = Key.Numpad3;
+                dashKey = Key.Numpad5;
+                stunAttackKey = Key.Numpad0;
+            }
+        }
+
         private void InitializeInputsByPosition()
         {
+            // 名前や設定済みplayerIDから明示的に判定
+            if (name.Contains("P2") || name.Contains("RightSide") || name.Contains("Player2") || (character != null && character.playerID == 2))
+            {
+                SetupKeys(2);
+                return;
+            }
+            if (name.Contains("P1") || name.Contains("LeftSide") || name.Contains("Player1") || (character != null && character.playerID == 1 && !name.Contains("P2")))
+            {
+                SetupKeys(1);
+                return;
+            }
+
             PlayerInputController[] controllers = FindObjectsByType<PlayerInputController>(FindObjectsSortMode.None);
 
             // Sort by X position to determine playerID and assign keys to all controllers in the scene
@@ -52,66 +93,26 @@ namespace FightingGameBase
                 System.Array.Sort(controllers, (a, b) => a.transform.position.x.CompareTo(b.transform.position.x));
                 for (int i = 0; i < controllers.Length; i++)
                 {
-                    var ctrl = controllers[i];
-                    var charBase = ctrl.GetComponent<CharacterBase>();
-                    if (charBase != null)
-                    {
-                        charBase.playerID = i + 1;
-                    }
-
-                    if (i == 0) // Player 1
-                    {
-                        ctrl.leftKey = Key.A;
-                        ctrl.rightKey = Key.D;
-                        ctrl.jumpKey = Key.Space;
-                        ctrl.normalAttackKey = Key.J;
-                        ctrl.specialAttackKey = Key.K;
-                        ctrl.blockKey = Key.H;
-                        ctrl.dashKey = Key.L;
-                        ctrl.stunAttackKey = Key.C;
-                    }
-                    else if (i == 1) // Player 2
-                    {
-                        ctrl.leftKey = Key.LeftArrow;
-                        ctrl.rightKey = Key.RightArrow;
-                        ctrl.jumpKey = Key.UpArrow;
-                        ctrl.normalAttackKey = Key.Numpad1;
-                        ctrl.specialAttackKey = Key.Numpad2;
-                        ctrl.blockKey = Key.Numpad3;
-                        ctrl.dashKey = Key.Numpad5;
-                        ctrl.stunAttackKey = Key.Numpad0;
-                    }
+                    controllers[i].SetupKeys(i + 1);
                 }
             }
             else
             {
                 // Fallback for single controller setup
-                if (character != null)
+                if (character != null && character.playerID == 2)
                 {
-                    if (character.playerID == 1)
-                    {
-                        leftKey = Key.A;
-                        rightKey = Key.D;
-                        jumpKey = Key.Space;
-                        normalAttackKey = Key.J;
-                        specialAttackKey = Key.K;
-                        blockKey = Key.H;
-                        dashKey = Key.L;
-                        stunAttackKey = Key.C;
-                    }
-                    else if (character.playerID == 2)
-                    {
-                        leftKey = Key.LeftArrow;
-                        rightKey = Key.RightArrow;
-                        jumpKey = Key.UpArrow;
-                        normalAttackKey = Key.Numpad1;
-                        specialAttackKey = Key.Numpad2;
-                        blockKey = Key.Numpad3;
-                        dashKey = Key.Numpad5;
-                        stunAttackKey = Key.Numpad0;
-                    }
+                    SetupKeys(2);
+                }
+                else
+                {
+                    SetupKeys(1);
                 }
             }
+        }
+
+        public bool IsSpecialAttackHeld()
+        {
+            return IsKeyPressed(specialAttackKey);
         }
 
         private bool IsKeyPressed(Key key)

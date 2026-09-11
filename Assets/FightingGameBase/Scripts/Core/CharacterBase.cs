@@ -18,6 +18,12 @@ namespace FightingGameBase
         public bool isDead;
         public bool isStunned = false;
 
+        [Header("リスポーン設定")]
+        [Tooltip("最大ライフ数（残機）。0になったら本当に死亡。")]
+        public int maxLives = 3;
+        [HideInInspector]
+        public int remainingLives;
+
         [Header("Dash & Evade Configurations")]
         public bool isInvincible = false;
         public bool isDashingOrEvading = false;
@@ -77,30 +83,45 @@ namespace FightingGameBase
 
         protected Rigidbody2D rb;
         protected Animator animator;
+        protected Collider2D mainCollider;
+        private float originalGravityScale = 3f;
 
         protected virtual void Start()
         {
-            rb = GetComponent<Rigidbody2D>();
-            rb.mass = 1000f;
-            
-            // Determine playerID dynamically based on position (Left = 1P, Right = 2P)
-            var allChars = FindObjectsByType<CharacterBase>(FindObjectsSortMode.None);
-            if (allChars.Length == 2)
+            // キャラクターセレクト経由で生成されたキャラクター（_P1 / _P2）以外で、
+            // ゲームスタート時にHierarchyに最初から置かれていたキャラクターは即座に消去
+            if (!CharacterSelectManager.IsSpawningFromSelect && !name.EndsWith("_P1") && !name.EndsWith("_P2"))
             {
-                System.Array.Sort(allChars, (a, b) => a.transform.position.x.CompareTo(b.transform.position.x));
-                playerID = (this == allChars[0]) ? 1 : 2;
+                Destroy(gameObject);
+                return;
+            }
+
+            rb = GetComponent<Rigidbody2D>();
+            mainCollider = GetComponent<Collider2D>();
+            if (rb != null)
+            {
+                rb.mass = 1000f;
+                originalGravityScale = rb.gravityScale;
+            }
+            
+            // Determine playerID dynamically based on explicit name or position
+            if (name.Contains("P2") || name.Contains("RightSide") || name.Contains("Player2") || name.Contains("(1)"))
+            {
+                playerID = 2;
+            }
+            else if (name.Contains("P1") || name.Contains("LeftSide") || name.Contains("Player1"))
+            {
+                playerID = 1;
             }
             else
             {
-                if (name.Contains("P2") || name.Contains("RightSide") || name.Contains("Player2") || name.Contains("(1)"))
+                var allChars = FindObjectsByType<CharacterBase>(FindObjectsSortMode.None);
+                if (allChars.Length == 2)
                 {
-                    playerID = 2;
+                    System.Array.Sort(allChars, (a, b) => a.transform.position.x.CompareTo(b.transform.position.x));
+                    playerID = (this == allChars[0]) ? 1 : 2;
                 }
-                else if (name.Contains("P1") || name.Contains("LeftSide") || name.Contains("Player1"))
-                {
-                    playerID = 1;
-                }
-            } // Prevent characters from easily pushing each other like lightweight blocks
+            }
             animator = GetComponentInChildren<Animator>();
             if (animator != null && animator.runtimeAnimatorController == null)
             {
@@ -118,6 +139,7 @@ namespace FightingGameBase
             }
             currentHP = maxHP;
             currentMana = maxMana;
+            remainingLives = maxLives;
 
             // Auto-instantiate HUDManager if it's missing in the scene
             if (FindAnyObjectByType<HUDManager>() == null)
@@ -133,6 +155,9 @@ namespace FightingGameBase
                 h.owner = this;
                 h.ownerPlayerID = playerID;
             }
+
+            // 初期のスプライトカラーをキャッシュ
+            CacheOriginalColorsIfNeeded();
         }
 
         protected virtual void Update()
@@ -157,8 +182,8 @@ namespace FightingGameBase
                 SafeSetFloat("Speed", 0f);
             }
 
-            // Ground check (based on vertical velocity threshold)
-            isGrounded = Mathf.Abs(rb.linearVelocity.y) < 0.1f;
+            // Ground check (コライダーの物理接地判定により、空中の頂点でダブルジャンプが発生しないようにする)
+            isGrounded = CheckGrounded();
 
             SafeSetBool("IsGrounded", isGrounded);
 
@@ -168,6 +193,63 @@ namespace FightingGameBase
                 currentMana += manaRegenSpeed * Time.deltaTime;
                 if (currentMana > maxMana) currentMana = maxMana;
             }
+        }
+
+        /// <summary>
+        /// 物理コライダーを用いて足元が地面に接触しているかを正確に判定します。
+        /// 空中の頂点などで速度が0になっても接地と誤判定されないようにし、ダブルジャンプを防止します。
+        /// </summary>
+        private bool CheckGrounded()
+        {
+            if (rb == null) return false;
+
+            // ジャンプ等で上方向に移動中なら確実に空中
+            if (rb.linearVelocity.y > 0.1f)
+            {
+                return false;
+            }
+
+            if (mainCollider == null)
+            {
+                mainCollider = GetComponent<Collider2D>();
+            }
+
+            if (mainCollider != null)
+            {
+                Bounds bounds = mainCollider.bounds;
+                // コライダーの足元から下方向へBoxCastで地面をチェック
+                Vector2 checkOrigin = new Vector2(bounds.center.x, bounds.min.y + 0.05f);
+                Vector2 checkSize = new Vector2(bounds.size.x * 0.7f, 0.08f);
+
+                RaycastHit2D[] hits = Physics2D.BoxCastAll(checkOrigin, checkSize, 0f, Vector2.down, 0.12f);
+                foreach (var hit in hits)
+                {
+                    if (hit.collider == null || hit.collider.isTrigger) continue;
+
+                    // 自分自身または子オブジェクトのコライダーは除外
+                    if (hit.collider.gameObject == gameObject || hit.collider.transform.IsChildOf(transform)) continue;
+
+                    // 相手キャラクターのコライダーも地面とは判定しない
+                    if (hit.collider.GetComponentInParent<CharacterBase>() != null) continue;
+
+                    return true;
+                }
+            }
+            else
+            {
+                // コライダー未設定時のフォールバック
+                RaycastHit2D[] hits = Physics2D.RaycastAll(transform.position, Vector2.down, 1.2f);
+                foreach (var hit in hits)
+                {
+                    if (hit.collider == null || hit.collider.isTrigger) continue;
+                    if (hit.collider.gameObject == gameObject || hit.collider.transform.IsChildOf(transform)) continue;
+                    if (hit.collider.GetComponentInParent<CharacterBase>() != null) continue;
+
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         // 攻撃ヒット時やイベント時にマナを増加させるメソッド
@@ -198,6 +280,8 @@ namespace FightingGameBase
         {
             if (isDead || !isGrounded || isStunned) return;
 
+            // ジャンプ実行（1回のみジャンプ可能にする）
+            isGrounded = false;
             float force = stats != null ? stats.jumpForce : 12f;
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, force);
 
@@ -239,7 +323,40 @@ namespace FightingGameBase
             Debug.Log("Ultimate attack triggered.");
         }
 
+        private SpriteRenderer[] cachedRenderers;
+        private Color[] originalSpriteColors;
         private Coroutine hitFlashCoroutine;
+        private Coroutine respawnInvincibilityCoroutine;
+
+        private void CacheOriginalColorsIfNeeded()
+        {
+            if (cachedRenderers == null || cachedRenderers.Length == 0)
+            {
+                cachedRenderers = GetComponentsInChildren<SpriteRenderer>(true);
+                originalSpriteColors = new Color[cachedRenderers.Length];
+                for (int i = 0; i < cachedRenderers.Length; i++)
+                {
+                    if (cachedRenderers[i] != null)
+                    {
+                        originalSpriteColors[i] = cachedRenderers[i].color;
+                    }
+                }
+            }
+        }
+
+        private void ResetToOriginalColors()
+        {
+            CacheOriginalColorsIfNeeded();
+            if (cachedRenderers == null || originalSpriteColors == null) return;
+
+            for (int i = 0; i < cachedRenderers.Length; i++)
+            {
+                if (cachedRenderers[i] != null && i < originalSpriteColors.Length)
+                {
+                    cachedRenderers[i].color = originalSpriteColors[i];
+                }
+            }
+        }
 
         public virtual void TakeDamage(int damage, Hitbox attackerHitbox = null)
         {
@@ -262,14 +379,6 @@ namespace FightingGameBase
             if (hitFlashCoroutine != null) StopCoroutine(hitFlashCoroutine);
             hitFlashCoroutine = StartCoroutine(PlayHitFlashRoutine());
 
-            // 攻撃判定からのノックバック反動（吹き飛び）
-            if (rb != null && attackerHitbox != null)
-            {
-                float pushDir = Mathf.Sign(transform.position.x - attackerHitbox.transform.position.x);
-                if (pushDir == 0) pushDir = 1f;
-                rb.linearVelocity = new Vector2(pushDir * 4.5f, 2.0f);
-            }
-
             // Register hit in HUD for damage popups, combos, and HP bars
             if (HUDManager.Instance != null)
             {
@@ -284,25 +393,40 @@ namespace FightingGameBase
 
         private IEnumerator PlayHitFlashRoutine()
         {
-            SpriteRenderer[] srs = GetComponentsInChildren<SpriteRenderer>();
-            Color[] origColors = new Color[srs.Length];
-            for (int i = 0; i < srs.Length; i++)
+            CacheOriginalColorsIfNeeded();
+            if (cachedRenderers == null) yield break;
+
+            for (int i = 0; i < cachedRenderers.Length; i++)
             {
-                origColors[i] = srs[i].color;
-                srs[i].color = new Color(1f, 0.2f, 0.2f, 1f); // 赤色に被弾フラッシュ
+                if (cachedRenderers[i] != null)
+                {
+                    cachedRenderers[i].color = new Color(1f, 0.2f, 0.2f, 1f); // 赤色に被弾フラッシュ
+                }
             }
 
             yield return new WaitForSeconds(0.2f);
 
-            for (int i = 0; i < srs.Length; i++)
-            {
-                if (srs[i] != null) srs[i].color = origColors[i];
-            }
+            ResetToOriginalColors();
+            hitFlashCoroutine = null;
         }
 
         private void Die()
         {
             isDead = true;
+            remainingLives--;
+
+            // 実行中のエフェクトコルーチンを停止して色をリセット
+            if (hitFlashCoroutine != null)
+            {
+                StopCoroutine(hitFlashCoroutine);
+                hitFlashCoroutine = null;
+            }
+            if (respawnInvincibilityCoroutine != null)
+            {
+                StopCoroutine(respawnInvincibilityCoroutine);
+                respawnInvincibilityCoroutine = null;
+            }
+            ResetToOriginalColors();
 
             SafeSetBool("IsDead", true);
 
@@ -310,6 +434,319 @@ namespace FightingGameBase
             {
                 GameManager.Instance.OnCharacterDied(playerID);
             }
+        }
+
+        // =========================================================
+        // リスポーン演出（ステージ中央へのダイナミック着地＆エフェクト）
+        // =========================================================
+        private static Sprite shockwaveSprite = null;
+        private static Sprite beamSprite = null;
+
+        private static Sprite GetOrCreateShockwaveSprite()
+        {
+            if (shockwaveSprite != null) return shockwaveSprite;
+
+            int size = 128;
+            Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+            tex.wrapMode = TextureWrapMode.Clamp;
+
+            Vector2 center = new Vector2(size * 0.5f, size * 0.5f);
+            float outerRadius = size * 0.48f;
+            float innerRadius = size * 0.30f;
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dist = Vector2.Distance(new Vector2(x, y), center);
+                    if (dist >= innerRadius && dist <= outerRadius)
+                    {
+                        float mid = (innerRadius + outerRadius) * 0.5f;
+                        float halfWidth = (outerRadius - innerRadius) * 0.5f;
+                        float alpha = 1f - Mathf.Abs(dist - mid) / halfWidth;
+                        alpha = Mathf.SmoothStep(0f, 1f, alpha);
+                        tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+                    }
+                    else
+                    {
+                        tex.SetPixel(x, y, Color.clear);
+                    }
+                }
+            }
+            tex.Apply();
+            shockwaveSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
+            return shockwaveSprite;
+        }
+
+        private static Sprite GetOrCreateBeamSprite()
+        {
+            if (beamSprite != null) return beamSprite;
+
+            int w = 32;
+            int h = 128;
+            Texture2D tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+            tex.wrapMode = TextureWrapMode.Clamp;
+
+            for (int y = 0; y < h; y++)
+            {
+                float verticalAlpha = 1f - (float)y / h; // 上に向かってフェード
+                for (int x = 0; x < w; x++)
+                {
+                    float horizontalAlpha = 1f - Mathf.Abs((x - w * 0.5f) / (w * 0.5f));
+                    float alpha = Mathf.Clamp01(horizontalAlpha * verticalAlpha);
+                    tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+                }
+            }
+            tex.Apply();
+            beamSprite = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0f));
+            return beamSprite;
+        }
+
+        private IEnumerator AnimateLandingEffects(Vector3 groundPos)
+        {
+            // 1. 光の柱（上空から降り注ぐビーム）
+            GameObject beamObj = new GameObject("Respawn_Beam");
+            beamObj.transform.position = groundPos;
+            SpriteRenderer beamSr = beamObj.AddComponent<SpriteRenderer>();
+            beamSr.sprite = GetOrCreateBeamSprite();
+            beamSr.color = new Color(1f, 0.25f, 0.2f, 0.85f);
+            beamSr.sortingOrder = 10;
+            beamObj.transform.localScale = new Vector3(3.0f, 10f, 1f);
+
+            // 2. 地面の衝撃波リング
+            GameObject ringObj = new GameObject("Respawn_Shockwave");
+            ringObj.transform.position = groundPos + new Vector3(0f, 0.1f, 0f);
+            SpriteRenderer ringSr = ringObj.AddComponent<SpriteRenderer>();
+            ringSr.sprite = GetOrCreateShockwaveSprite();
+            ringSr.color = new Color(1f, 0.35f, 0.2f, 0.95f);
+            ringSr.sortingOrder = 11;
+            ringObj.transform.localScale = new Vector3(0.6f, 0.25f, 1f);
+
+            float elapsed = 0f;
+            float duration = 0.45f;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+
+                if (beamObj != null)
+                {
+                    float beamWidth = Mathf.Lerp(3.0f, 0.1f, t);
+                    beamObj.transform.localScale = new Vector3(beamWidth, 10f, 1f);
+                    Color bc = beamSr.color;
+                    bc.a = Mathf.Lerp(0.85f, 0f, t);
+                    beamSr.color = bc;
+                }
+
+                if (ringObj != null)
+                {
+                    float ringScaleX = Mathf.Lerp(0.6f, 7.0f, t);
+                    float ringScaleY = Mathf.Lerp(0.25f, 2.0f, t);
+                    ringObj.transform.localScale = new Vector3(ringScaleX, ringScaleY, 1f);
+                    Color rc = ringSr.color;
+                    rc.a = Mathf.Lerp(0.95f, 0f, t);
+                    ringSr.color = rc;
+                }
+
+                yield return null;
+            }
+
+            if (beamObj != null) Destroy(beamObj);
+            if (ringObj != null) Destroy(ringObj);
+        }
+
+        /// <summary>
+        /// キャラクターをステージ真ん中にダイナミックに着地リスポーンさせます。
+        /// </summary>
+        public void Respawn()
+        {
+            // HP・状態のリセット
+            currentHP = maxHP;
+            isDead = false;
+            isStunned = false;
+            isInvincible = true; // リスポーン演出開始から無敵
+            isDashingOrEvading = false;
+            currentPosture = 0f;
+            currentMana = maxMana;
+
+            // 実行中のエフェクトコルーチンを停止
+            if (hitFlashCoroutine != null)
+            {
+                StopCoroutine(hitFlashCoroutine);
+                hitFlashCoroutine = null;
+            }
+            if (respawnInvincibilityCoroutine != null)
+            {
+                StopCoroutine(respawnInvincibilityCoroutine);
+                respawnInvincibilityCoroutine = null;
+            }
+
+            // アニメーターのリセット
+            SafeSetBool("IsDead", false);
+            SafeResetTrigger("Damage");
+            SafeResetTrigger("Stunned");
+            SafeSetFloat("Speed", 0f);
+
+            // 速度リセット
+            if (rb != null)
+            {
+                rb.linearVelocity = Vector2.zero;
+            }
+
+            // 真ん中に上空からかっこよく着地するリスポーンシーケンスを開始
+            respawnInvincibilityCoroutine = StartCoroutine(RespawnSequenceRoutine());
+
+            Debug.Log($"プレイヤー{playerID} が真ん中にリスポーン！ 残りライフ: {remainingLives}");
+        }
+
+        private IEnumerator RespawnSequenceRoutine()
+        {
+            isInvincible = true;
+
+            CacheOriginalColorsIfNeeded();
+
+            Transform visuals = transform.Find("Visuals");
+            if (visuals == null) visuals = transform;
+            Vector3 baseScale = visuals.localScale;
+
+            // 相手のいる方向を向く
+            CharacterBase opponent = null;
+            CharacterBase[] allChars = FindObjectsByType<CharacterBase>(FindObjectsSortMode.None);
+            foreach (var c in allChars)
+            {
+                if (c != this && !c.isDead)
+                {
+                    opponent = c;
+                    break;
+                }
+            }
+
+            if (opponent != null)
+            {
+                float dir = opponent.transform.position.x - 0f; // 中央(0f)から相手の向き
+                float face = dir >= 0 ? 1f : -1f;
+                transform.localScale = new Vector3(face, 1f, 1f);
+            }
+            else
+            {
+                transform.localScale = new Vector3(playerID == 1 ? 1f : -1f, 1f, 1f);
+            }
+
+            // 地面の正確な高さをレイキャストで取得
+            float groundY = -0.5f;
+            RaycastHit2D groundHit = Physics2D.Raycast(new Vector2(0f, 10f), Vector2.down, 25f);
+            if (groundHit.collider != null && !groundHit.collider.isTrigger)
+            {
+                float charHalfHeight = 1.0f;
+                if (mainCollider != null) charHalfHeight = mainCollider.bounds.extents.y;
+                groundY = groundHit.point.y + charHalfHeight;
+            }
+
+            float spawnHeight = groundY + 7.0f; // 真ん中の上空から降下
+            Vector3 startPos = new Vector3(0f, spawnHeight, transform.position.z);
+            Vector3 landPos = new Vector3(0f, groundY, transform.position.z);
+
+            transform.position = startPos;
+            if (rb != null)
+            {
+                rb.linearVelocity = Vector2.zero;
+                rb.gravityScale = 0f; // 降下演出中は物理重力をオフ
+            }
+
+            // 最初から赤色オーラをまとう
+            Color redAuraColor = new Color(1f, 0.2f, 0.2f, 1.0f);
+            if (cachedRenderers != null)
+            {
+                for (int i = 0; i < cachedRenderers.Length; i++)
+                {
+                    if (cachedRenderers[i] != null) cachedRenderers[i].color = redAuraColor;
+                }
+            }
+
+            // 上空から中央へ高速急降下（0.22秒）
+            float dropDuration = 0.22f;
+            float dropElapsed = 0f;
+
+            // 降下中は縦長にストレッチ
+            visuals.localScale = new Vector3(baseScale.x * 0.75f, baseScale.y * 1.35f, baseScale.z);
+
+            while (dropElapsed < dropDuration)
+            {
+                dropElapsed += Time.deltaTime;
+                float t = dropElapsed / dropDuration;
+                float curvedT = t * t; // 加速しながら降下
+                transform.position = Vector3.Lerp(startPos, landPos, curvedT);
+                yield return null;
+            }
+
+            transform.position = landPos;
+            if (rb != null)
+            {
+                rb.linearVelocity = Vector2.zero;
+                rb.gravityScale = originalGravityScale; // 通常重力に復帰
+            }
+
+            // ★着地インパクト演出！
+            // 1. 画面シェイク
+            if (HUDManager.Instance != null)
+            {
+                HUDManager.Instance.TriggerScreenShake(0.22f, 0.14f);
+            }
+
+            // 2. 着地衝撃波（Shockwave）＆光の柱エフェクト
+            float contactY = groundHit.collider != null ? groundHit.point.y : groundY - 1f;
+            StartCoroutine(AnimateLandingEffects(new Vector3(0f, contactY, 0f)));
+
+            // 3. 着地のスカッシュ（ヒーロー着地の沈み込み）＆反動アニメーション（0.12秒）
+            float landElapsed = 0f;
+            float landDuration = 0.12f;
+            while (landElapsed < landDuration)
+            {
+                landElapsed += Time.deltaTime;
+                float lt = landElapsed / landDuration;
+                float sx = Mathf.Lerp(baseScale.x * 1.4f, baseScale.x, lt);
+                float sy = Mathf.Lerp(baseScale.y * 0.6f, baseScale.y, lt);
+                visuals.localScale = new Vector3(sx, sy, baseScale.z);
+                yield return null;
+            }
+            visuals.localScale = baseScale;
+
+            // ★着地後、2秒間の無敵時間（赤色点滅）を継続
+            float remainingInvincible = 2.0f - dropDuration - landDuration;
+            if (remainingInvincible < 1.0f) remainingInvincible = 1.6f;
+
+            float blinkInterval = 0.12f;
+            float invElapsed = 0f;
+            bool blinkState = false;
+
+            while (invElapsed < remainingInvincible)
+            {
+                blinkState = !blinkState;
+                Color blinkColor = blinkState 
+                    ? new Color(1f, 0.15f, 0.15f, 1.0f) 
+                    : new Color(1f, 0.2f, 0.2f, 0.35f);
+
+                if (cachedRenderers != null)
+                {
+                    for (int i = 0; i < cachedRenderers.Length; i++)
+                    {
+                        if (cachedRenderers[i] != null) cachedRenderers[i].color = blinkColor;
+                    }
+                }
+
+                yield return new WaitForSeconds(blinkInterval);
+                invElapsed += blinkInterval;
+            }
+
+            // 無敵時間終了：元の色・状態に完全に戻す
+            ResetToOriginalColors();
+            visuals.localScale = baseScale;
+
+            isInvincible = false;
+            respawnInvincibilityCoroutine = null;
         }
 
         public virtual void StartBlock() { }
@@ -636,7 +1073,7 @@ namespace FightingGameBase
         // =========================================================
         // Animator パラメーター安全制御ヘルパー
         // =========================================================
-        private bool HasAnimatorParameter(string paramName)
+        protected bool HasAnimatorParameter(string paramName)
         {
             if (animator == null || animator.runtimeAnimatorController == null) return false;
             foreach (AnimatorControllerParameter param in animator.parameters)
@@ -646,7 +1083,7 @@ namespace FightingGameBase
             return false;
         }
 
-        private void SafeSetBool(string paramName, bool value)
+        protected void SafeSetBool(string paramName, bool value)
         {
             if (HasAnimatorParameter(paramName))
             {
@@ -654,7 +1091,7 @@ namespace FightingGameBase
             }
         }
 
-        private void SafeSetFloat(string paramName, float value)
+        protected void SafeSetFloat(string paramName, float value)
         {
             if (HasAnimatorParameter(paramName))
             {
@@ -662,7 +1099,7 @@ namespace FightingGameBase
             }
         }
 
-        private void SafeSetTrigger(string paramName)
+        protected void SafeSetTrigger(string paramName)
         {
             if (HasAnimatorParameter(paramName))
             {
@@ -670,7 +1107,7 @@ namespace FightingGameBase
             }
         }
 
-        private void SafeResetTrigger(string paramName)
+        protected void SafeResetTrigger(string paramName)
         {
             if (HasAnimatorParameter(paramName))
             {

@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
+using UnityEngine.InputSystem;
 
 namespace FightingGameBase
 {
@@ -47,6 +48,12 @@ namespace FightingGameBase
         private Text timerText;
         private float roundTimeRemaining = 99f;
         private bool isTimerActive = true;
+
+        // Stock / Lives icons
+        private GameObject p1StockContainer;
+        private GameObject p2StockContainer;
+        private Text respawnNotifyText;
+        private Coroutine respawnNotifyCoroutine;
 
         // Combos
         private int p1ComboCount = 0;
@@ -320,12 +327,20 @@ namespace FightingGameBase
             CreateLabel(hudHeader, "P2_Posture_Label", "POSTURE", new Vector2(320, -83), 7, new Color(1f, 1f, 1f, 0.75f), uiFont, TextAnchor.MiddleRight, new Vector2(0.5f, 1.0f));
             CreateLabel(hudHeader, "P2_Mana_Label", "MANA", new Vector2(320, -94), 7, new Color(1f, 1f, 1f, 0.75f), uiFont, TextAnchor.MiddleRight, new Vector2(0.5f, 1.0f));
 
-            // 6. Create Combo Counter Text Fields
+            // 6. Create Stock / Lives icons
+            p1StockContainer = CreateStockIcons(hudHeader, "P1_Stocks", new Vector2(-320, -38), false);
+            p2StockContainer = CreateStockIcons(hudHeader, "P2_Stocks", new Vector2(320, -38), true);
+
+            // 7. Create Combo Counter Text Fields
             p1ComboText = CreateTextWithShadow(canvasObj, "P1_Combo", "", new Vector2(-280, -140), 24, new Color(1.0f, 0.85f, 0.2f), uiFont, TextAnchor.MiddleLeft, new Vector2(0.5f, 1.0f), new Vector2(0f, 1.0f));
             p1ComboText.gameObject.SetActive(false);
 
             p2ComboText = CreateTextWithShadow(canvasObj, "P2_Combo", "", new Vector2(280, -140), 24, new Color(1.0f, 0.85f, 0.2f), uiFont, TextAnchor.MiddleRight, new Vector2(0.5f, 1.0f), new Vector2(1f, 1.0f));
             p2ComboText.gameObject.SetActive(false);
+
+            // 8. Respawn notification text (centered, initially hidden)
+            respawnNotifyText = CreateTextWithShadow(canvasObj, "Respawn_Notify", "", new Vector2(0, -200), 36, new Color(0.2f, 1f, 0.5f), uiFont, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), 500);
+            respawnNotifyText.gameObject.SetActive(false);
 
             // Force UI Layer (5) recursively
             SetLayerRecursively(canvasObj, 5);
@@ -494,7 +509,344 @@ namespace FightingGameBase
             bar.fillRect = fillRect;
             bar.fillImage = fillImg;
 
+            // 5. Mana Bar Dividers (25, 50, 75 の目盛り縦線)
+            if (name.Contains("Mana"))
+            {
+                float[] thresholds = { 0.25f, 0.50f, 0.75f };
+                foreach (float t in thresholds)
+                {
+                    int val = Mathf.RoundToInt(t * 100);
+
+                    // 線の背後シャドウ（黒、幅2.5pxでくっきり境界を作る）
+                    GameObject shadowLine = new GameObject($"{name}_Line_Shadow_{val}");
+                    shadowLine.transform.SetParent(bgObj.transform, false);
+                    RectTransform sRect = shadowLine.AddComponent<RectTransform>();
+                    if (isP2)
+                    {
+                        sRect.anchorMin = new Vector2(1, 0);
+                        sRect.anchorMax = new Vector2(1, 1);
+                        sRect.pivot = new Vector2(0.5f, 0.5f);
+                        sRect.anchoredPosition = new Vector2(-t * size.x, 0);
+                    }
+                    else
+                    {
+                        sRect.anchorMin = new Vector2(0, 0);
+                        sRect.anchorMax = new Vector2(0, 1);
+                        sRect.pivot = new Vector2(0.5f, 0.5f);
+                        sRect.anchoredPosition = new Vector2(t * size.x, 0);
+                    }
+                    sRect.sizeDelta = new Vector2(2.5f, 2f);
+                    Image sImg = shadowLine.AddComponent<Image>();
+                    sImg.color = new Color(0.02f, 0.02f, 0.05f, 0.95f);
+
+                    // 前面ハイライト縦線（発光シアンホワイト）
+                    GameObject lineObj = new GameObject($"{name}_Line_{val}");
+                    lineObj.transform.SetParent(bgObj.transform, false);
+                    RectTransform lRect = lineObj.AddComponent<RectTransform>();
+                    if (isP2)
+                    {
+                        lRect.anchorMin = new Vector2(1, 0);
+                        lRect.anchorMax = new Vector2(1, 1);
+                        lRect.pivot = new Vector2(0.5f, 0.5f);
+                        lRect.anchoredPosition = new Vector2(-t * size.x, 0);
+                    }
+                    else
+                    {
+                        lRect.anchorMin = new Vector2(0, 0);
+                        lRect.anchorMax = new Vector2(0, 1);
+                        lRect.pivot = new Vector2(0.5f, 0.5f);
+                        lRect.anchoredPosition = new Vector2(t * size.x, 0);
+                    }
+                    lRect.sizeDelta = new Vector2(1.2f, 0f);
+                    Image lImg = lineObj.AddComponent<Image>();
+                    lImg.color = (t == 0.5f) ? new Color(1f, 1f, 1f, 0.95f) : new Color(0.85f, 0.95f, 1f, 0.85f);
+                }
+            }
+
             return bar;
+        }
+
+        /// <summary>
+        /// ストック（残機）アイコンを作成する
+        /// </summary>
+        private GameObject CreateStockIcons(GameObject parent, string name, Vector2 pos, bool isP2)
+        {
+            GameObject container = new GameObject(name);
+            container.transform.SetParent(parent.transform, false);
+            RectTransform containerRect = container.AddComponent<RectTransform>();
+            containerRect.anchorMin = new Vector2(0.5f, 1.0f);
+            containerRect.anchorMax = new Vector2(0.5f, 1.0f);
+            containerRect.pivot = isP2 ? new Vector2(1f, 0.5f) : new Vector2(0f, 0.5f);
+            containerRect.anchoredPosition = pos;
+            containerRect.sizeDelta = new Vector2(80, 16);
+
+            // Create 3 stock circle icons
+            for (int i = 0; i < 3; i++)
+            {
+                GameObject icon = new GameObject($"Stock_{i}");
+                icon.transform.SetParent(container.transform, false);
+                RectTransform iconRect = icon.AddComponent<RectTransform>();
+                float xOffset = isP2 ? -(i * 18f) : (i * 18f);
+                iconRect.anchorMin = isP2 ? new Vector2(1f, 0.5f) : new Vector2(0f, 0.5f);
+                iconRect.anchorMax = isP2 ? new Vector2(1f, 0.5f) : new Vector2(0f, 0.5f);
+                iconRect.pivot = new Vector2(0.5f, 0.5f);
+                iconRect.anchoredPosition = new Vector2(xOffset, 0);
+                iconRect.sizeDelta = new Vector2(12, 12);
+
+                Image iconImg = icon.AddComponent<Image>();
+                iconImg.sprite = GetCircleSprite();
+                iconImg.color = isP2 ? new Color(1f, 0.5f, 0.15f, 1f) : new Color(0.15f, 0.75f, 1f, 1f);
+            }
+
+            return container;
+        }
+
+        /// <summary>
+        /// ストックアイコンの表示を更新する
+        /// </summary>
+        private void UpdateStockIcons(GameObject container, int remainingLives, bool isP2)
+        {
+            if (container == null) return;
+
+            for (int i = 0; i < container.transform.childCount; i++)
+            {
+                Image img = container.transform.GetChild(i).GetComponent<Image>();
+                if (img != null)
+                {
+                    if (i < remainingLives)
+                    {
+                        // 残機あり: 明るい色
+                        img.color = isP2 ? new Color(1f, 0.5f, 0.15f, 1f) : new Color(0.15f, 0.75f, 1f, 1f);
+                    }
+                    else
+                    {
+                        // 残機なし: 暗い色
+                        img.color = new Color(0.2f, 0.2f, 0.2f, 0.4f);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// リスポーン通知テキストを画面中央に表示する
+        /// </summary>
+        public void ShowRespawnNotification(int playerID, int livesRemaining)
+        {
+            if (respawnNotifyText == null) return;
+
+            if (respawnNotifyCoroutine != null) StopCoroutine(respawnNotifyCoroutine);
+            respawnNotifyCoroutine = StartCoroutine(RespawnNotifyRoutine(playerID, livesRemaining));
+        }
+
+        private IEnumerator RespawnNotifyRoutine(int playerID, int livesRemaining)
+        {
+            respawnNotifyText.gameObject.SetActive(true);
+            respawnNotifyText.text = $"P{playerID} RESPAWN!  ×{livesRemaining}";
+            respawnNotifyText.color = new Color(0.2f, 1f, 0.5f, 1f);
+
+            // Scale pop
+            float popElapsed = 0f;
+            while (popElapsed < 0.15f)
+            {
+                popElapsed += Time.deltaTime;
+                float s = Mathf.Lerp(1.8f, 1f, popElapsed / 0.15f);
+                respawnNotifyText.transform.localScale = new Vector3(s, s, 1f);
+                yield return null;
+            }
+            respawnNotifyText.transform.localScale = Vector3.one;
+
+            yield return new WaitForSeconds(1.5f);
+
+            // Fade out
+            float fadeElapsed = 0f;
+            while (fadeElapsed < 0.5f)
+            {
+                fadeElapsed += Time.deltaTime;
+                Color c = respawnNotifyText.color;
+                c.a = 1f - (fadeElapsed / 0.5f);
+                respawnNotifyText.color = c;
+                yield return null;
+            }
+
+            respawnNotifyText.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// 勝敗結果画面を表示する（K.O. → PLAYER X WIN!）
+        /// </summary>
+        public void ShowGameResult(int winnerID)
+        {
+            StartCoroutine(GameResultRoutine(winnerID));
+        }
+
+        private IEnumerator GameResultRoutine(int winnerID)
+        {
+            // --- 半透明の暗いオーバーレイ ---
+            GameObject overlay = new GameObject("GameResult_Overlay");
+            overlay.transform.SetParent(canvas.transform, false);
+            RectTransform overlayRect = overlay.AddComponent<RectTransform>();
+            overlayRect.anchorMin = Vector2.zero;
+            overlayRect.anchorMax = Vector2.one;
+            overlayRect.sizeDelta = Vector2.zero;
+            Image overlayImg = overlay.AddComponent<Image>();
+            overlayImg.color = new Color(0f, 0f, 0f, 0f);
+
+            // オーバーレイをフェードイン
+            float fadeInDur = 0.5f;
+            float elapsed = 0f;
+            while (elapsed < fadeInDur)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                overlayImg.color = new Color(0f, 0f, 0f, Mathf.Lerp(0f, 0.6f, elapsed / fadeInDur));
+                yield return null;
+            }
+            overlayImg.color = new Color(0f, 0f, 0f, 0.6f);
+
+            // --- K.O. テキスト ---
+            Text koText = CreateTextWithShadow(overlay, "KO_Text", "K.O.", new Vector2(0, 30), 72, new Color(1f, 0.2f, 0.15f), uiFont, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), 500);
+
+            // K.O. ポップインアニメーション
+            elapsed = 0f;
+            float popDur = 0.3f;
+            while (elapsed < popDur)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = elapsed / popDur;
+                // バウンス感のあるイージング
+                float scale;
+                if (t < 0.6f)
+                    scale = Mathf.Lerp(3f, 0.9f, t / 0.6f);
+                else
+                    scale = Mathf.Lerp(0.9f, 1f, (t - 0.6f) / 0.4f);
+                koText.transform.localScale = new Vector3(scale, scale, 1f);
+                yield return null;
+            }
+            koText.transform.localScale = Vector3.one;
+
+            // 画面を揺らす
+            TriggerScreenShake(0.3f, 0.15f);
+
+            yield return new WaitForSecondsRealtime(1.0f);
+
+            // --- K.O. テキストをフェードアウト ---
+            elapsed = 0f;
+            float koFadeDur = 0.4f;
+            while (elapsed < koFadeDur)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float a = 1f - (elapsed / koFadeDur);
+                koText.color = new Color(1f, 0.2f, 0.15f, a);
+                yield return null;
+            }
+            koText.gameObject.SetActive(false);
+
+            // --- 勝者テキスト ---
+            string winnerName = "";
+            CharacterBase[] allChars = FindObjectsByType<CharacterBase>(FindObjectsSortMode.None);
+            foreach (CharacterBase c in allChars)
+            {
+                if (c.playerID == winnerID)
+                {
+                    winnerName = c.gameObject.name.Replace("(Clone)", "").ToUpper();
+                    break;
+                }
+            }
+
+            Color winColor = winnerID == 1 ? new Color(0.15f, 0.85f, 1f) : new Color(1f, 0.5f, 0.15f);
+            Text winText = CreateTextWithShadow(overlay, "Winner_Text", $"PLAYER {winnerID}  WIN!", new Vector2(0, 20), 52, winColor, uiFont, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), 600);
+            
+            // キャラ名を下に表示
+            Text nameText = CreateTextWithShadow(overlay, "Winner_Name", winnerName, new Vector2(0, -30), 28, new Color(1f, 0.85f, 0.2f), uiFont, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), 500);
+
+            // 勝者テキストのスライドイン
+            elapsed = 0f;
+            float slideDur = 0.4f;
+            while (elapsed < slideDur)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = elapsed / slideDur;
+                // 左からスライドイン
+                float x = Mathf.Lerp(-400f, 0f, Mathf.SmoothStep(0f, 1f, t));
+                winText.rectTransform.anchoredPosition = new Vector2(x, 20);
+                // 右からスライドイン（キャラ名）
+                float x2 = Mathf.Lerp(400f, 0f, Mathf.SmoothStep(0f, 1f, t));
+                nameText.rectTransform.anchoredPosition = new Vector2(x2, -30);
+                yield return null;
+            }
+
+            // 勝者テキストが輝くパルスアニメーション（ループ）
+            // 「SPACE または R キーでキャラクターセレクトへ」案内テキスト
+            Text promptText = CreateTextWithShadow(overlay, "Restart_Prompt", "PRESS [ SPACE ] OR [ R ] FOR CHARACTER SELECT", new Vector2(0, -90), 22, Color.white, uiFont, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), 650);
+
+            // クリックでも戻れるようにボタン機能も追加
+            Button restartBtn = overlay.AddComponent<Button>();
+            restartBtn.onClick.AddListener(() =>
+            {
+                if (CharacterSelectManager.Instance != null)
+                {
+                    CharacterSelectManager.Instance.ResetToCharacterSelect();
+                }
+            });
+
+            while (true)
+            {
+                float pulse = 1f + Mathf.PingPong(Time.unscaledTime * 1.5f, 0.08f);
+                winText.transform.localScale = new Vector3(pulse, pulse, 1f);
+
+                if (promptText != null)
+                {
+                    float alpha = 0.5f + Mathf.PingPong(Time.unscaledTime * 2f, 0.5f);
+                    promptText.color = new Color(1f, 1f, 1f, alpha);
+                }
+
+                // キー入力でキャラクターセレクトへ戻る
+                bool restartPressed = false;
+                if (Keyboard.current != null)
+                {
+                    restartPressed = Keyboard.current.spaceKey.wasPressedThisFrame
+                                  || Keyboard.current.rKey.wasPressedThisFrame
+                                  || Keyboard.current.enterKey.wasPressedThisFrame;
+                }
+
+                if (restartPressed)
+                {
+                    if (CharacterSelectManager.Instance != null)
+                    {
+                        CharacterSelectManager.Instance.ResetToCharacterSelect();
+                    }
+                    else
+                    {
+                        CharacterSelectManager.ClearAllExistingCharacters();
+                        UnityEngine.SceneManagement.SceneManager.LoadScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex);
+                    }
+                    yield break;
+                }
+
+                yield return null;
+            }
+        }
+
+        /// <summary>
+        /// HUDの状態を初期状態にリセットする
+        /// </summary>
+        public void ResetHUD()
+        {
+            StopAllCoroutines();
+            if (canvas != null)
+            {
+                Transform overlay = canvas.transform.Find("GameResult_Overlay");
+                if (overlay != null)
+                {
+                    Destroy(overlay.gameObject);
+                }
+            }
+            if (respawnNotifyText != null)
+            {
+                respawnNotifyText.gameObject.SetActive(false);
+            }
+
+            player1 = null;
+            player2 = null;
         }
 
         private void SetBarValue(ProgressBarUI bar, float percent)
@@ -865,6 +1217,9 @@ namespace FightingGameBase
                 {
                     p1HpBar.fillImage.color = Color.white;
                 }
+
+                // ストック表示の更新
+                UpdateStockIcons(p1StockContainer, player1.remainingLives, false);
             }
             else
             {
@@ -913,6 +1268,9 @@ namespace FightingGameBase
                 {
                     p2HpBar.fillImage.color = Color.white;
                 }
+
+                // ストック表示の更新
+                UpdateStockIcons(p2StockContainer, player2.remainingLives, true);
             }
             else
             {

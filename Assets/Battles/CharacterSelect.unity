@@ -161,6 +161,8 @@ MonoBehaviour:
     prefab: {fileID: 32054691481803748, guid: 266b9263a1a352542ba8117c225ddbf9, type: 3}
   - displayName: "\u30AC\u30F3\u30E9\u30F3\u30B9"
     prefab: {fileID: 7586327911102753318, guid: 600b291e20936a547969e4afe7d68458, type: 3}
+  - displayName: "\u708E"
+    prefab: {fileID: 6626323812190787258, guid: e32407095b065b04f9053b894a438e3c, type: 3}
   spawnX: 5
   spawnY: -1
 --- !u!4 &82592726

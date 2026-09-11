@@ -56,6 +56,7 @@ namespace FightingGameBase.Editor
                 MakeEntry("鞭", "Assets/鞭/WhipCharacter.prefab"),
                 MakeEntry("ハンマー", "Assets/hammer/Prefabs/HammerCharacter.prefab"),
                 MakeEntry("ガンランス", "Assets/gannrannsu/Prefabs/GannrannsuCharacter.prefab"),
+                MakeEntry("炎", "Assets/Flame/FlameCharacter.prefab"),
             };
 
             EditorSceneManager.MarkSceneDirty(scene);

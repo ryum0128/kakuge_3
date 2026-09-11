@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections;
 
 namespace FightingGameBase
 {
@@ -26,6 +27,10 @@ namespace FightingGameBase
         // 試合中かどうかをすぐに確認できる便利な項目です。
         public bool IsPlaying => currentState == GameState.Playing;
 
+        [Header("リスポーン設定")]
+        [Tooltip("リスポーンまでの待機時間（秒）")]
+        public float respawnDelay = 1.5f;
+
         void Awake()
         {
             // --- シングルトンの設定 ---
@@ -52,9 +57,16 @@ namespace FightingGameBase
                 hudGo.AddComponent<HUDManager>();
             }
 
-            // 実際はここで「Round 1... Fight!」などのUI演出を行いますが、
-            // 今はテスト用なのですぐに試合を開始します！
-            StartBattle();
+            // キャラクターセレクトマネージャーが存在する場合は、キャラクター選択が完了するまで待機
+            if (FindAnyObjectByType<CharacterSelectManager>() != null)
+            {
+                currentState = GameState.Starting;
+                Debug.Log("GameManager: キャラクターセレクト完了待機中…");
+            }
+            else
+            {
+                StartBattle();
+            }
         }
 
         private void EnsureStageBoundaries()
@@ -78,6 +90,14 @@ namespace FightingGameBase
             }
         }
 
+        // 試合をリセットするメソッド（キャラクターセレクトへ戻る際など）
+        public void ResetGame()
+        {
+            StopAllCoroutines();
+            currentState = GameState.Starting;
+            Debug.Log("GameManager: 状態をリセットしました");
+        }
+
         // 試合を開始するメソッド
         public void StartBattle()
         {
@@ -91,16 +111,59 @@ namespace FightingGameBase
             // すでにゲームが終わっていたら、何もしません
             if (currentState != GameState.Playing) return;
 
+            // 倒れたキャラクターを見つける
+            CharacterBase deadChar = FindDeadCharacter(deadPlayerID);
+
+            // 残りライフがあればリスポーンさせる
+            if (deadChar != null && deadChar.remainingLives > 0)
+            {
+                Debug.Log($"プレイヤー {deadPlayerID} が倒れた！ 残りライフ: {deadChar.remainingLives} — リスポーンします…");
+                StartCoroutine(RespawnAfterDelay(deadChar));
+                return;
+            }
+
+            // ライフが0以下 → 本当のゲームオーバー
             currentState = GameState.GameOver; // 状態を「ゲーム終了」に変更！
             
             // 倒れたのが1Pなら2Pの勝ち、2Pなら1Pの勝ちとして計算します
             int winnerID = deadPlayerID == 1 ? 2 : 1;
             
             Debug.Log($"ゲームセット！ プレイヤー {winnerID} の勝利！");
-            
-            // 【改造のヒント】
-            // 実際はここで「K.O.」の文字を画面に出したり、勝った方の勝ちアニメーションを
-            // 再生したりするプログラムをここに追加します！
+
+            // HUDに勝敗結果を表示
+            if (HUDManager.Instance != null)
+            {
+                HUDManager.Instance.ShowGameResult(winnerID);
+            }
+        }
+
+        /// <summary>
+        /// 指定したplayerIDのCharacterBaseを探して返す
+        /// </summary>
+        private CharacterBase FindDeadCharacter(int playerID)
+        {
+            CharacterBase[] allChars = FindObjectsByType<CharacterBase>(FindObjectsSortMode.None);
+            foreach (CharacterBase c in allChars)
+            {
+                if (c.playerID == playerID) return c;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// 一定時間待ってからリスポーンを実行するコルーチン
+        /// </summary>
+        private IEnumerator RespawnAfterDelay(CharacterBase character)
+        {
+            yield return new WaitForSeconds(respawnDelay);
+            character.Respawn();
+
+            // HUDにリスポーン通知を表示
+            if (HUDManager.Instance != null)
+            {
+                HUDManager.Instance.ShowRespawnNotification(character.playerID, character.remainingLives);
+            }
         }
     }
 }
+
