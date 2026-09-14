@@ -28,8 +28,8 @@ Transform:
   m_GameObject: {fileID: 2009901277636853284}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.35, y: 0.7, z: 1}
+  m_LocalPosition: {x: 0.01, y: -0, z: 0}
+  m_LocalScale: {x: 0.17343557, y: 0.32382, z: 0.4626}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 3876622791648101654}
@@ -124,7 +124,7 @@ Animator:
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
   m_AnimatePhysics: 0
-  m_WarningMessage:
+  m_WarningMessage: 
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
@@ -230,7 +230,7 @@ CapsuleCollider2D:
   m_CompositeOperation: 0
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
-  m_Size: {x: 0.13, y: 4.13}
+  m_Size: {x: 0.11, y: 2.05}
   m_Direction: 0
 --- !u!114 &997153061386518893
 MonoBehaviour:
@@ -251,6 +251,8 @@ MonoBehaviour:
   isGrounded: 0
   isDead: 0
   isStunned: 0
+  maxLives: 3
+  remainingLives: 0
   isInvincible: 0
   isDashingOrEvading: 0
   lastHurtTime: -10

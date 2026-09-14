@@ -58,14 +58,18 @@ namespace FightingGameBase
             }
 
             // キャラクターセレクトマネージャーが存在する場合は、キャラクター選択が完了するまで待機
-            if (FindAnyObjectByType<CharacterSelectManager>() != null)
+            // (ただし、すでに StartBattle() が呼ばれて Playing になっている場合は何もしない)
+            if (currentState != GameState.Playing)
             {
-                currentState = GameState.Starting;
-                Debug.Log("GameManager: キャラクターセレクト完了待機中…");
-            }
-            else
-            {
-                StartBattle();
+                if (FindAnyObjectByType<CharacterSelectManager>() != null)
+                {
+                    currentState = GameState.Starting;
+                    Debug.Log("GameManager: キャラクターセレクト完了待機中…");
+                }
+                else
+                {
+                    StartBattle();
+                }
             }
         }
 

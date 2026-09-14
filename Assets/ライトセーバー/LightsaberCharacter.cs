@@ -53,6 +53,8 @@ namespace FightingGameBase
             if (anim != null && anim.runtimeAnimatorController != null)
             {
                 anim.SetTrigger("AttackNormal");
+                if (currentSwingCoroutine != null) StopCoroutine(currentSwingCoroutine);
+                currentSwingCoroutine = StartCoroutine(SwingStateRoutine(0.32f));
             }
             else
             {
@@ -60,10 +62,7 @@ namespace FightingGameBase
                 Transform visuals = transform.Find("Visuals");
                 if (visuals != null)
                 {
-                    if (currentSwingCoroutine != null)
-                    {
-                        StopCoroutine(currentSwingCoroutine);
-                    }
+                    if (currentSwingCoroutine != null) StopCoroutine(currentSwingCoroutine);
                     currentSwingCoroutine = StartCoroutine(OverheadSlashAnimation(visuals, 0.32f));
                 }
             }
@@ -79,16 +78,15 @@ namespace FightingGameBase
             if (anim != null && anim.runtimeAnimatorController != null)
             {
                 anim.SetTrigger("AttackSpecial");
+                if (currentSwingCoroutine != null) StopCoroutine(currentSwingCoroutine);
+                currentSwingCoroutine = StartCoroutine(SwingStateRoutine(0.45f));
             }
             else
             {
                 Transform visuals = transform.Find("Visuals");
                 if (visuals != null)
                 {
-                    if (currentSwingCoroutine != null)
-                    {
-                        StopCoroutine(currentSwingCoroutine);
-                    }
+                    if (currentSwingCoroutine != null) StopCoroutine(currentSwingCoroutine);
                     currentSwingCoroutine = StartCoroutine(HeavySlamAnimation(visuals, 0.45f));
                 }
             }
@@ -104,19 +102,26 @@ namespace FightingGameBase
             if (anim != null && anim.runtimeAnimatorController != null)
             {
                 anim.SetTrigger("AttackUltimate");
+                if (currentSwingCoroutine != null) StopCoroutine(currentSwingCoroutine);
+                currentSwingCoroutine = StartCoroutine(SwingStateRoutine(0.6f));
             }
             else
             {
                 Transform visuals = transform.Find("Visuals");
                 if (visuals != null)
                 {
-                    if (currentSwingCoroutine != null)
-                    {
-                        StopCoroutine(currentSwingCoroutine);
-                    }
+                    if (currentSwingCoroutine != null) StopCoroutine(currentSwingCoroutine);
                     currentSwingCoroutine = StartCoroutine(TripleSlashAnimation(visuals, 0.6f));
                 }
             }
+        }
+
+        private IEnumerator SwingStateRoutine(float duration)
+        {
+            isSwinging = true;
+            yield return new WaitForSeconds(duration);
+            isSwinging = false;
+            currentSwingCoroutine = null;
         }
 
         // =========================================================
@@ -397,15 +402,12 @@ namespace FightingGameBase
                 yield return null;
             }
 
-            if (isCounterStance)
+            isCounterStance = false;
+            if (spriteRenderer != null && spriteNormal != null)
             {
-                isCounterStance = false;
-                if (spriteRenderer != null && spriteNormal != null)
-                {
-                    spriteRenderer.sprite = spriteNormal;
-                }
-                isSwinging = false;
+                spriteRenderer.sprite = spriteNormal;
             }
+            isSwinging = false;
         }
 
         private void TriggerCounterAttack(int incomingDamage, Hitbox attackerHitbox)

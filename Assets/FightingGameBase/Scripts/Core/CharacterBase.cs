@@ -219,7 +219,8 @@ namespace FightingGameBase
                 Bounds bounds = mainCollider.bounds;
                 // コライダーの足元から下方向へBoxCastで地面をチェック
                 Vector2 checkOrigin = new Vector2(bounds.center.x, bounds.min.y + 0.05f);
-                Vector2 checkSize = new Vector2(bounds.size.x * 0.7f, 0.08f);
+                float castWidth = Mathf.Max(bounds.size.x * 0.7f, 0.2f);
+                Vector2 checkSize = new Vector2(castWidth, 0.08f);
 
                 RaycastHit2D[] hits = Physics2D.BoxCastAll(checkOrigin, checkSize, 0f, Vector2.down, 0.12f);
                 foreach (var hit in hits)

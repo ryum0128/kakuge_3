@@ -269,6 +269,7 @@ namespace FightingGameBase
             {
                 GameObject gmGo = new GameObject("GameManager");
                 gmGo.AddComponent<GameManager>();
+                GameManager.Instance.StartBattle();
             }
             else
             {

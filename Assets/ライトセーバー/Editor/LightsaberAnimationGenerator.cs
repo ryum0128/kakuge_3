@@ -69,9 +69,9 @@ namespace FightingGameBase.Editor
                 new Keyframe(0.32f, 0.0f)
             );
 
-            EditorCurveBinding bindRotZ = EditorCurveBinding.FloatCurve("Visuals", typeof(Transform), "m_LocalRotation.z");
-            EditorCurveBinding bindPosX = EditorCurveBinding.FloatCurve("Visuals", typeof(Transform), "m_LocalPosition.x");
-            EditorCurveBinding bindPosY = EditorCurveBinding.FloatCurve("Visuals", typeof(Transform), "m_LocalPosition.y");
+            EditorCurveBinding bindRotZ = EditorCurveBinding.FloatCurve("", typeof(Transform), "localEulerAnglesRaw.z");
+            EditorCurveBinding bindPosX = EditorCurveBinding.FloatCurve("", typeof(Transform), "m_LocalPosition.x");
+            EditorCurveBinding bindPosY = EditorCurveBinding.FloatCurve("", typeof(Transform), "m_LocalPosition.y");
 
             AnimationUtility.SetEditorCurve(slashClip, bindRotZ, slashRotZ);
             AnimationUtility.SetEditorCurve(slashClip, bindPosX, slashPosX);
