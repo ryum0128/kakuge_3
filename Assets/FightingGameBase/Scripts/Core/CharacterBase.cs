@@ -46,7 +46,7 @@ namespace FightingGameBase
 
         [Header("スタンスキル設定")]
         [Tooltip("スタンスキルの最大使用回数")]
-        public int maxStunUses = 2;              // スタンスキルの使用上限（2回）
+        public int maxStunUses = 3;              // スタンスキルの使用上限（3回）
 
         [Tooltip("チャージゲージが満タンになるまでの時間（秒）")]
         public float stunChargeTime = 10f;      // ゲージが0から100%になるまでの時間

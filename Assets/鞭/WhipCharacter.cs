@@ -38,7 +38,7 @@ namespace FightingGameBase
         public float skillDuration = 5f;
 
         [Tooltip("1試合でスキルを使える上限回数")]
-        public int maxSkillUses = 1;
+        public int maxSkillUses = 2;
 
         /// <summary>
         /// 残りのスキル使用可能回数
