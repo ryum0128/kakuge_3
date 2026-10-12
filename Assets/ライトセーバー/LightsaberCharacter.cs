@@ -476,13 +476,13 @@ namespace FightingGameBase
                 return;
             }
 
-            // If the attack is a projectile and HP is 90% or higher, negate it!
+            // If the attack is a projectile and HP is 70% or higher, negate it!
             if (attackerHitbox != null && attackerHitbox.isProjectile)
             {
                 float healthPercent = (float)currentHP / maxHP;
-                if (healthPercent >= 0.9f)
+                if (healthPercent >= 0.7f)
                 {
-                    Debug.Log("Lightsaber negated projectile damage (HP >= 90%).");
+                    Debug.Log("Lightsaber negated projectile damage (HP >= 70%).");
                     return; // Ignore damage entirely!
                 }
             }
