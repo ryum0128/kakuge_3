@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using System.Collections;
 
 namespace FightingGameBase
@@ -478,6 +478,7 @@ namespace FightingGameBase
                 {
                     // ★パリー成功！
                     Debug.Log("★炎のパリー成功！ノーダメージ！");
+                    AudioManager.PlayParrySound();
                     lastParryTime = -10f; // パリークールダウン即時リセット
 
                     // 姿勢値回復ボーナス
@@ -495,6 +496,7 @@ namespace FightingGameBase
                     // 通常ブロック成功
                     Debug.Log("炎のガード成功！ダメージ防御！");
                     float postureMultiplier = attackerHitbox != null ? attackerHitbox.postureDamageMultiplier : 1.5f;
+                    AudioManager.PlayBlockSound();
                     currentPosture += damage * postureMultiplier;
 
                     if (currentPosture >= maxPosture)
@@ -915,10 +917,10 @@ namespace FightingGameBase
                 }
 
                 // キー入力の継続判定（キーを離したらその時点のレベルで発射）
-                bool keyHeld = IsChargeKeyHeld();
+                bool keyHeld = (GetComponent<SandbagAI>() != null) ? (chargeTimer < 1.05f) : IsChargeKeyHeld();
                 if (!keyHeld)
                 {
-                    if (currentLevel >= 1)
+                    if (currentLevel >= 1 || GetComponent<SandbagAI>() != null)
                     {
                         // 1秒以上溜めた状態で離した → 即発射！
                         break;

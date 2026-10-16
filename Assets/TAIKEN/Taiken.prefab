@@ -343,9 +343,12 @@ MonoBehaviour:
   isGrounded: 0
   isDead: 0
   isStunned: 0
+  maxLives: 3
+  remainingLives: 0
   isInvincible: 0
   isDashingOrEvading: 0
   lastHurtTime: -10
+  maxStunUses: 3
   stunChargeTime: 10
   stunChargeGauge: 0
   maxPosture: 100
@@ -496,6 +499,14 @@ MonoBehaviour:
   postureDamageMultiplier: 1.5
   isNormalAttack: 1
   isProjectile: 0
+  useDistanceScaling: 0
+  nearDamageMultiplier: 0.4
+  farDamageMultiplier: 1.8
+  maxScalingDistance: 4
+  useTimeScaling: 0
+  maxTimeScalingDuration: 0.6
+  startDamageMultiplier: 1
+  endDamageMultiplier: 0.3
   owner: {fileID: 0}
 --- !u!1 &6838727873647340436
 GameObject:

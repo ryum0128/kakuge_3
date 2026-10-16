@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using System.Collections;
 
 namespace FightingGameBase
@@ -615,6 +615,7 @@ namespace FightingGameBase
                     Debug.Log("★ダガーパリー成功！ノーダメージ！");
                     
                     // Reset parry cooldown immediately to reward player for successful parry!
+                    AudioManager.PlayParrySound();
                     lastParryTime = -10f;
 
                     // Recover posture by the attack's damage as a reward
@@ -632,6 +633,7 @@ namespace FightingGameBase
                     
                     // Accumulate posture based on damage (using custom multiplier if hit by a specific hitbox)
                     float postureMultiplier = attackerHitbox != null ? attackerHitbox.postureDamageMultiplier : 1.5f;
+                    AudioManager.PlayBlockSound();
                     currentPosture += damage * postureMultiplier;
 
                     if (currentPosture >= maxPosture)

@@ -12,7 +12,7 @@ namespace FightingGameBase
         [Tooltip("Rotation angle at the end of swing.")]
         public float swingEndAngle = -90f;
         [Tooltip("Duration of the swing down phase.")]
-        public float swingDuration = 0.12f;
+        public float swingDuration = 0.20f;
         [Tooltip("Duration of the recover phase.")]
         public float recoverDuration = 0.28f;
 
@@ -232,8 +232,8 @@ namespace FightingGameBase
 
             float elapsed = 0f;
 
-            // 1. 予備動作（ウィンドアップ）: 武器を肩上に高く振りかぶる (0.18秒)
-            float windupDuration = 0.18f;
+            // 1. 予備動作（ウィンドアップ）: 武器を肩上に高く振りかぶる (0.24秒)
+            float windupDuration = 0.24f;
             while (elapsed < windupDuration)
             {
                 elapsed += Time.deltaTime;
@@ -250,19 +250,7 @@ namespace FightingGameBase
                 yield return null;
             }
 
-            // 2. 振り下ろしの瞬間に攻撃判定（Hitbox）を有効化！スキンと同じサイズ（1.2 x 0.8）に設定！
-            if (hitbox != null)
-            {
-                hitbox.transform.localPosition = normalWeaponPos;
-                BoxCollider2D col = hitbox.GetComponent<BoxCollider2D>();
-                if (col != null)
-                {
-                    col.size = normalWeaponSize; // 武器スキンと同じ大きさと長さに同期！
-                }
-                StartCoroutine(ActivateHitboxTemporarily(hitbox.gameObject, swingDuration));
-            }
-
-            // 3. 振り下ろしフェーズ: 地面に向かって前方に超大弧一気斬り (-95度) (0.16秒)
+            // 2. 振り下ろしフェーズ: 地面に向かって前方に超大弧一気斬り (-95度) (swingDuration)
             elapsed = 0f;
             while (elapsed < swingDuration)
             {
@@ -284,9 +272,32 @@ namespace FightingGameBase
                 yield return null;
             }
 
-            yield return new WaitForSeconds(0.04f);
+            // 振り下ろし完了姿勢に固定
+            if (visualsTransform != null)
+            {
+                Quaternion rot = Quaternion.Euler(0, 0, -95f);
+                visualsTransform.localRotation = rot;
+                visualsTransform.localPosition = handPivot + rot * weaponOffset;
+            }
 
-            // 4. 回収（フォロースルー）フェーズ (0.22秒)
+            // 3. 【振り下ろし完了後】に攻撃判定（Hitbox）を有効化！
+            // 降ろされた瞬間ではなく、降ろし終わったタイミングで攻撃判定を出すことで、
+            // プレイヤーが振り下ろしを見てから正確にパリーできるようにする
+            float activeHitboxDuration = 0.18f;
+            if (hitbox != null)
+            {
+                hitbox.transform.localPosition = normalWeaponPos;
+                BoxCollider2D col = hitbox.GetComponent<BoxCollider2D>();
+                if (col != null)
+                {
+                    col.size = normalWeaponSize; // 武器スキンと同じ大きさと長さに同期！
+                }
+                StartCoroutine(ActivateHitboxTemporarily(hitbox.gameObject, activeHitboxDuration));
+            }
+
+            yield return new WaitForSeconds(activeHitboxDuration);
+
+            // 4. 回収（フォロースルー）フェーズ (0.24秒)
             elapsed = 0f;
             while (elapsed < recoverDuration)
             {
@@ -325,7 +336,7 @@ namespace FightingGameBase
         [Tooltip("Weapon rotation angle during charge.")]
         public float chargeWindupAngle = 120f;
         [Tooltip("Duration of the release swing phase.")]
-        public float chargeReleaseDuration = 0.06f;
+        public float chargeReleaseDuration = 0.18f;
         [Tooltip("Weapon rotation angle after release.")]
         public float chargeReleaseAngle = -130f;
         [Tooltip("Damage of the special attack.")]
@@ -378,9 +389,25 @@ namespace FightingGameBase
                 visualsTransform.localRotation = Quaternion.Euler(0, 0, chargeWindupAngle);
             yield return new WaitForSeconds(0.05f);
 
-            // Phase 2: Release
+            // Phase 2: Release (振り下ろし)
             Debug.Log("Charged Swing: Phase 2 (Release) started.");
 
+            elapsed = 0f;
+            while (elapsed < chargeReleaseDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Pow(elapsed / chargeReleaseDuration, 3f);
+                float angle = Mathf.Lerp(chargeWindupAngle, chargeReleaseAngle, t);
+                if (visualsTransform != null)
+                    visualsTransform.localRotation = Quaternion.Euler(0, 0, angle);
+                yield return null;
+            }
+
+            if (visualsTransform != null)
+                visualsTransform.localRotation = Quaternion.Euler(0, 0, chargeReleaseAngle);
+
+            // 振り下ろし完了後に攻撃判定を有効化！
+            float specialHitboxDuration = 0.20f;
             if (hitbox != null)
             {
                 hitbox.damage = chargeSlashDamage;
@@ -393,24 +420,11 @@ namespace FightingGameBase
                     col.size = specialWeaponSize;
                 }
 
-                StartCoroutine(ActivateHitboxTemporarily(hitbox.gameObject, chargeReleaseDuration + 0.08f));
-                StartCoroutine(RestoreDamageAndSize(hitbox, col, weaponSr, originalDamage, origPos, origSize, chargeReleaseDuration + 0.1f));
+                StartCoroutine(ActivateHitboxTemporarily(hitbox.gameObject, specialHitboxDuration));
+                StartCoroutine(RestoreDamageAndSize(hitbox, col, weaponSr, originalDamage, origPos, origSize, specialHitboxDuration + 0.05f));
             }
 
-            elapsed = 0f;
-            while (elapsed < chargeReleaseDuration)
-            {
-                elapsed += Time.deltaTime;
-                float t = Mathf.Pow(elapsed / chargeReleaseDuration, 4f);
-                float angle = Mathf.Lerp(chargeWindupAngle, chargeReleaseAngle, t);
-                if (visualsTransform != null)
-                    visualsTransform.localRotation = Quaternion.Euler(0, 0, angle);
-                yield return null;
-            }
-
-            if (visualsTransform != null)
-                visualsTransform.localRotation = Quaternion.Euler(0, 0, chargeReleaseAngle);
-            yield return new WaitForSeconds(0.08f);
+            yield return new WaitForSeconds(specialHitboxDuration);
 
             // Phase 3: Recovery
             Debug.Log("Charged Swing: Phase 3 (Recovery) started.");
@@ -670,6 +684,7 @@ namespace FightingGameBase
                 {
                     // --- DeepWoken Parry Success ---
                     Debug.Log("★ PARRY SUCCESS! (DeepWoken Style) ★");
+                    AudioManager.PlayParrySound();
                     
                     // Reset parry cooldown immediately to reward player for successful parry!
                     lastParryTime = -10f;
@@ -701,6 +716,7 @@ namespace FightingGameBase
                 {
                     // --- DeepWoken Block Success ---
                     Debug.Log("Block success. Posture accumulating.");
+                    AudioManager.PlayBlockSound();
                     
                     // Accumulate posture based on damage (using custom multiplier if hit by a specific hitbox)
                     float postureMultiplier = attackerHitbox != null ? attackerHitbox.postureDamageMultiplier : 1.5f;

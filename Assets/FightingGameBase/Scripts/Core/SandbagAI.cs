@@ -18,7 +18,24 @@ namespace FightingGameBase
         [Tooltip("If true, the dummy will automatically attack at intervals.")]
         public bool autoAttack = true;
         [Tooltip("Interval between attacks in seconds.")]
-        public float attackInterval = 2.5f;
+        public float attackInterval = 2.0f;
+
+        public enum AttackMode
+        {
+            Normal,
+            Special,
+            None
+        }
+
+        [Tooltip("Attack mode repeatedly executed by sandbag.")]
+        public AttackMode attackMode = AttackMode.Normal;
+
+        public void SetAttackMode(AttackMode mode)
+        {
+            attackMode = mode;
+            autoAttack = (mode != AttackMode.None);
+            nextAttackTime = Time.time + attackInterval;
+        }
 
         private CharacterBase dummyCharacter;
         private float nextAttackTime;
@@ -152,13 +169,29 @@ namespace FightingGameBase
             }
 
             // Auto Attack (Parry Trainer) logic
-            if (autoAttack && Time.time >= nextAttackTime)
+            if (autoAttack && attackMode != AttackMode.None && Time.time >= nextAttackTime)
             {
-                if (!dummyCharacter.isStunned && !dummyCharacter.isBlockingState && !dummyCharacter.IsHurtLocked)
+                if (!dummyCharacter.isStunned && !dummyCharacter.isBlockingState && !dummyCharacter.IsHurtLocked && !dummyCharacter.IsAttacking)
                 {
-                    Debug.Log("[SandbagAI] Dummy triggers auto-attack normal.");
-                    dummyCharacter.AttackNormal();
-                    TriggerWeaponSwing();
+                    // Always make sure mana is replenished for special attacks
+                    dummyCharacter.currentMana = dummyCharacter.maxMana;
+
+                    if (attackMode == AttackMode.Normal)
+                    {
+                        Debug.Log("[SandbagAI] Dummy triggers auto-attack normal.");
+                        dummyCharacter.AttackNormal();
+                    }
+                    else if (attackMode == AttackMode.Special)
+                    {
+                        Debug.Log("[SandbagAI] Dummy triggers auto-attack special.");
+                        dummyCharacter.AttackSpecial();
+                    }
+
+                    // Only trigger fallback weapon swing if base character without specialized script
+                    if (dummyCharacter.GetType() == typeof(CharacterBase))
+                    {
+                        TriggerWeaponSwing();
+                    }
                 }
                 nextAttackTime = Time.time + attackInterval;
             }

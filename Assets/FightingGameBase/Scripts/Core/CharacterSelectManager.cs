@@ -5,8 +5,8 @@ namespace FightingGameBase
 {
     // =================================================================================
     // 【CharacterSelectManager（キャラクターセレクト画面）】
-    // 数字キー(1〜6)を使って、1P→2Pの順に武器を選択します。
-    // 2P側も選び終わったら、自動で2人を配置して対戦を開始します。
+    // 数字キー(1〜7)を使って、1P→2Pの順に武器を選択します。
+    // サンドバッグ（通常攻撃／スペシャル攻撃／停止）または2Pプレイヤー操作を選択可能。
     // =================================================================================
     public class CharacterSelectManager : MonoBehaviour
     {
@@ -17,7 +17,7 @@ namespace FightingGameBase
             public GameObject prefab;
         }
 
-        [Header("選択できる武器一覧 (1〜6キーに対応)")]
+        [Header("選択できる武器一覧 (1〜7キーに対応)")]
         public WeaponEntry[] weapons;
 
         [Header("配置設定")]
@@ -40,6 +40,20 @@ namespace FightingGameBase
 
         private enum Phase { SelectP1, SelectP2, Fighting }
         private Phase phase = Phase.SelectP1;
+
+        public enum OpponentMode
+        {
+            Player2,
+            SandbagNormal,
+            SandbagSpecial,
+            SandbagNone
+        }
+
+        [Header("2P / サンドバッグの動作モード")]
+        public OpponentMode opponentMode = OpponentMode.SandbagNormal;
+
+        private GameObject currentP1;
+        private GameObject currentP2;
 
         private WeaponEntry p1Choice;
 
@@ -73,7 +87,6 @@ namespace FightingGameBase
         {
             Instance = this;
             EnsureWeaponsLoaded();
-            // ゲーム起動・再開時：シーン上にすでに存在しているキャラクターや弾をすべて消去
             ClearAllExistingCharacters();
             ClearAllProjectiles();
         }
@@ -81,7 +94,6 @@ namespace FightingGameBase
         void Start()
         {
             EnsureWeaponsLoaded();
-            // Startでも既存キャラクターを消去して完全クリーンな状態で選択開始
             ClearAllExistingCharacters();
             ClearAllProjectiles();
         }
@@ -170,6 +182,8 @@ namespace FightingGameBase
             // 5. キャラクターセレクト画面の状態（1P選択フェーズ）に戻す
             phase = Phase.SelectP1;
             p1Choice = null;
+            currentP1 = null;
+            currentP2 = null;
 
             Debug.Log("【ゲーム再開】既存キャラクターをすべて消去し、キャラクターセレクト画面に接続しました！");
         }
@@ -255,6 +269,9 @@ namespace FightingGameBase
             GameObject p2Go = Instantiate(p2.prefab, new Vector3(spawnX, spawnY, 0f), Quaternion.identity);
             IsSpawningFromSelect = false;
 
+            currentP1 = p1Go;
+            currentP2 = p2Go;
+
             p1Go.name = $"{p1.displayName}_P1";
             p2Go.name = $"{p2.displayName}_P2";
 
@@ -264,6 +281,36 @@ namespace FightingGameBase
             // 1Pは右向き、2Pは左向き(お互いに向き合う)。動けば自動で向き直る。
             FaceDirection(p1Go.transform, 1f);
             FaceDirection(p2Go.transform, -1f);
+
+            // 2Pがサンドバッグ設定の場合の処理
+            if (opponentMode != OpponentMode.Player2)
+            {
+                // プレイヤーのキー入力を無効化（誤操作・二重入力防止）
+                PlayerInputController pic = p2Go.GetComponent<PlayerInputController>();
+                if (pic != null) Destroy(pic);
+                var gic = p2Go.GetComponent<GannrannsuInputController>();
+                if (gic != null) Destroy(gic);
+                var hic = p2Go.GetComponent<HammerInputController>();
+                if (hic != null) Destroy(hic);
+
+                SandbagAI sb = p2Go.GetComponent<SandbagAI>();
+                if (sb == null) sb = p2Go.AddComponent<SandbagAI>();
+                sb.isImmortal = true;
+                sb.attackInterval = 2.0f; // 2秒に1回繰り返す
+
+                if (opponentMode == OpponentMode.SandbagNormal)
+                {
+                    sb.SetAttackMode(SandbagAI.AttackMode.Normal);
+                }
+                else if (opponentMode == OpponentMode.SandbagSpecial)
+                {
+                    sb.SetAttackMode(SandbagAI.AttackMode.Special);
+                }
+                else
+                {
+                    sb.SetAttackMode(SandbagAI.AttackMode.None);
+                }
+            }
 
             if (GameManager.Instance == null)
             {
@@ -347,36 +394,115 @@ namespace FightingGameBase
         {
             EnsureStyles();
 
-            // 試合中：画面右上に「[R] キャラ選択へ戻る」ボタンを表示
+            // 試合中
             if (phase == Phase.Fighting)
             {
                 if (GUI.Button(new Rect(Screen.width - 170f, 10f, 160f, 28f), "[R] キャラ選択へ戻る", restartButtonStyle))
                 {
                     ResetToCharacterSelect();
                 }
+
+                // サンドバッグ操作パネル（対戦中でもいつでも通常/スペシャル/停止を切り替え可能）
+                SandbagAI sb = currentP2 != null ? currentP2.GetComponent<SandbagAI>() : null;
+                if (sb != null)
+                {
+                    GUI.Box(new Rect(15f, 10f, 360f, 90f), "【サンドバッグ攻撃設定 (2秒間隔)】");
+
+                    Color origColor = GUI.color;
+
+                    GUI.color = sb.attackMode == SandbagAI.AttackMode.Normal ? Color.green : Color.white;
+                    if (GUI.Button(new Rect(25f, 35f, 100f, 26f), sb.attackMode == SandbagAI.AttackMode.Normal ? "★通常攻撃" : "通常攻撃"))
+                    {
+                        sb.SetAttackMode(SandbagAI.AttackMode.Normal);
+                        opponentMode = OpponentMode.SandbagNormal;
+                    }
+
+                    GUI.color = sb.attackMode == SandbagAI.AttackMode.Special ? Color.yellow : Color.white;
+                    if (GUI.Button(new Rect(135f, 35f, 115f, 26f), sb.attackMode == SandbagAI.AttackMode.Special ? "★スペシャル" : "スペシャル攻撃"))
+                    {
+                        sb.SetAttackMode(SandbagAI.AttackMode.Special);
+                        opponentMode = OpponentMode.SandbagSpecial;
+                    }
+
+                    GUI.color = sb.attackMode == SandbagAI.AttackMode.None ? new Color(0.8f, 0.8f, 0.8f) : Color.white;
+                    if (GUI.Button(new Rect(260f, 35f, 95f, 26f), sb.attackMode == SandbagAI.AttackMode.None ? "★停止" : "攻撃停止"))
+                    {
+                        sb.SetAttackMode(SandbagAI.AttackMode.None);
+                        opponentMode = OpponentMode.SandbagNone;
+                    }
+
+                    GUI.color = origColor;
+
+                    string statusStr = sb.attackMode == SandbagAI.AttackMode.Normal ? "現在: 通常攻撃を2秒ごとにリピート中" :
+                                      (sb.attackMode == SandbagAI.AttackMode.Special ? "現在: スペシャル攻撃を2秒ごとにリピート中" : "現在: 攻撃停止中（棒立ち）");
+                    GUI.Label(new Rect(25f, 65f, 340f, 22f), statusStr);
+                }
                 return;
             }
 
-            // タイトル（コンパクト配置）
-            GUI.Label(new Rect(0, 15f, Screen.width, 36f), "キャラクターセレクト", titleStyle);
+            // タイトル
+            GUI.Label(new Rect(0, 10f, Screen.width, 36f), "キャラクターセレクト", titleStyle);
+
+            // サンドバッグ／2Pモード選択バー（キャラクター選択画面上部に大きく配置）
+            float modeBarY = 48f;
+            GUI.Label(new Rect(0, modeBarY, Screen.width, 22f), "【2P / サンドバッグの動作選択】", turnStyle);
+
+            float btnW = 155f;
+            float totalBtnW = btnW * 3 + 20f;
+            float startBtnX = (Screen.width - totalBtnW) / 2f;
+
+            Color oldColor = GUI.color;
+
+            // 通常攻撃リピート
+            GUI.color = (opponentMode == OpponentMode.SandbagNormal) ? Color.green : Color.white;
+            if (GUI.Button(new Rect(startBtnX, modeBarY + 24f, btnW, 28f), (opponentMode == OpponentMode.SandbagNormal ? "★ " : "") + "サンドバッグ: 通常攻撃"))
+            {
+                opponentMode = OpponentMode.SandbagNormal;
+            }
+
+            // スペシャル攻撃リピート
+            GUI.color = (opponentMode == OpponentMode.SandbagSpecial) ? Color.yellow : Color.white;
+            if (GUI.Button(new Rect(startBtnX + btnW + 10f, modeBarY + 24f, btnW, 28f), (opponentMode == OpponentMode.SandbagSpecial ? "★ " : "") + "サンドバッグ: スペシャル"))
+            {
+                opponentMode = OpponentMode.SandbagSpecial;
+            }
+
+            // 通常2P操作
+            GUI.color = (opponentMode == OpponentMode.Player2) ? Color.cyan : Color.white;
+            if (GUI.Button(new Rect(startBtnX + (btnW + 10f) * 2, modeBarY + 24f, btnW, 28f), (opponentMode == OpponentMode.Player2 ? "★ " : "") + "2Pプレイヤー操作"))
+            {
+                opponentMode = OpponentMode.Player2;
+            }
+            GUI.color = oldColor;
 
             // ターン案内（1P/2P）
-            string turnLabel = phase == Phase.SelectP1
-                ? $"1P  キャラクターを選んでください (1〜{weapons.Length})"
-                : $"2P  キャラクターを選んでください (1〜{weapons.Length})";
-            GUI.Label(new Rect(0, 52f, Screen.width, 24f), turnLabel, turnStyle);
+            string turnLabel;
+            if (phase == Phase.SelectP1)
+            {
+                turnLabel = $"1P  キャラクターを選んでください (1〜{weapons.Length})";
+            }
+            else
+            {
+                if (opponentMode == OpponentMode.SandbagNormal)
+                    turnLabel = $"サンドバッグ (通常攻撃 2秒間隔) の武器を選んでください (1〜{weapons.Length})";
+                else if (opponentMode == OpponentMode.SandbagSpecial)
+                    turnLabel = $"サンドバッグ (スペシャル攻撃 2秒間隔) の武器を選んでください (1〜{weapons.Length})";
+                else
+                    turnLabel = $"2P  キャラクターを選んでください (1〜{weapons.Length})";
+            }
+            GUI.Label(new Rect(0, modeBarY + 58f, Screen.width, 24f), turnLabel, turnStyle);
 
             bool hasPickedText = (phase == Phase.SelectP2 && p1Choice != null);
             if (hasPickedText)
             {
-                GUI.Label(new Rect(0, 78f, Screen.width, 20f), $"1P: {p1Choice.displayName}  に決定！", pickedStyle);
+                GUI.Label(new Rect(0, modeBarY + 82f, Screen.width, 20f), $"1P: {p1Choice.displayName}  に決定！", pickedStyle);
             }
 
             // ボタン一覧（行間・高さを抑えて全体的にコンパクトに）
             float rowHeight = 30f;
-            float boxWidth = 300f;
+            float boxWidth = 320f;
             float boxX = Screen.width / 2f - boxWidth / 2f;
-            float startY = hasPickedText ? 104f : 88f;
+            float startY = hasPickedText ? (modeBarY + 106f) : (modeBarY + 90f);
 
             for (int i = 0; i < weapons.Length; i++)
             {
