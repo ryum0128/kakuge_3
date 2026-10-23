@@ -51,12 +51,11 @@ namespace FightingGameBase.Editor
             manager.weapons = new[]
             {
                 MakeEntry("TAIKEN", "Assets/TAIKEN/Taiken.prefab"),
-                MakeEntry("ダガー", "Assets/Dagger/Dagger.prefab"),
-                MakeEntry("ライトセーバー", "Assets/ライトセーバー/LightsaberCharacter.prefab"),
-                MakeEntry("鞭", "Assets/鞭/WhipCharacter.prefab"),
-                MakeEntry("ハンマー", "Assets/hammer/Prefabs/HammerCharacter.prefab"),
-                MakeEntry("ガンランス", "Assets/gannrannsu/Prefabs/GannrannsuCharacter.prefab"),
-                MakeEntry("炎", "Assets/Flame/FlameCharacter.prefab"),
+                MakeEntry("Dagger", "Assets/Dagger/Dagger.prefab"),
+                MakeEntry("Flame", "Assets/Flame/FlameCharacter.prefab"),
+                MakeEntry("Thunder", "Assets/Thunder/ThunderCharacter.prefab"),
+                MakeEntry("Ice", "Assets/Ice/IceCharacter.prefab"),
+                MakeEntry("Shadow", "Assets/Shadow/ShadowCharacter.prefab"),
             };
 
             EditorSceneManager.MarkSceneDirty(scene);

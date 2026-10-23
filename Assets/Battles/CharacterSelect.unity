@@ -151,18 +151,12 @@ MonoBehaviour:
   weapons:
   - displayName: TAIKEN
     prefab: {fileID: 1896885702353374602, guid: be808d2f2c4dabc4ba6de18bbe527993, type: 3}
-  - displayName: "\u30C0\u30AC\u30FC"
+  - displayName: Dagger
     prefab: {fileID: 8221661614442200369, guid: 209ac6e397458ea479fd53e7d4805aaa, type: 3}
-  - displayName: "\u30E9\u30A4\u30C8\u30BB\u30FC\u30D0\u30FC"
-    prefab: {fileID: 4422184844040698010, guid: 28d55132866e8dd46a723662da8a9882, type: 3}
-  - displayName: "\u97AD"
-    prefab: {fileID: 7925490552805823003, guid: d2d80247fbcaf2b4a9671355e59cf33a, type: 3}
-  - displayName: "\u30CF\u30F3\u30DE\u30FC"
-    prefab: {fileID: 32054691481803748, guid: 266b9263a1a352542ba8117c225ddbf9, type: 3}
-  - displayName: "\u30AC\u30F3\u30E9\u30F3\u30B9"
-    prefab: {fileID: 7586327911102753318, guid: 600b291e20936a547969e4afe7d68458, type: 3}
-  - displayName: "\u708E"
+  - displayName: Flame
     prefab: {fileID: 6626323812190787258, guid: e32407095b065b04f9053b894a438e3c, type: 3}
+  - displayName: Thunder
+    prefab: {fileID: 7927899496466660772, guid: f3b149817e924bc4b01e9124a91901a3, type: 3}
   spawnX: 5
   spawnY: -1
 --- !u!4 &82592726

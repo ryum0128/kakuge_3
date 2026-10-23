@@ -100,6 +100,10 @@ namespace FightingGameBase
             StopAllCoroutines();
             currentState = GameState.Starting;
             Debug.Log("GameManager: 状態をリセットしました");
+            if (HUDManager.Instance != null)
+            {
+                HUDManager.Instance.ResetHUD();
+            }
         }
 
         // 試合を開始するメソッド
@@ -107,6 +111,50 @@ namespace FightingGameBase
         {
             currentState = GameState.Playing; // 状態を「試合中」に変更！
             Debug.Log("対戦スタート！");
+        }
+
+        /// <summary>
+        /// タイムアップ時の勝敗判定処理。
+        /// ストック数・体力が少ない方を敗北（残機0にしてゲームオーバー）とします。
+        /// </summary>
+        public void OnTimeUpResult(int winnerID, int loserID)
+        {
+            if (currentState != GameState.Playing) return;
+
+            currentState = GameState.GameOver;
+
+            if (winnerID == 0)
+            {
+                Debug.Log("タイムアップ！ 引き分け（DRAW GAME）！");
+                if (HUDManager.Instance != null)
+                {
+                    HUDManager.Instance.ShowGameResult(0);
+                }
+                return;
+            }
+
+            CharacterBase loser = FindDeadCharacter(loserID);
+            if (loser != null)
+            {
+                loser.isInvincible = false;
+                loser.remainingLives = 0;
+                loser.currentHP = 0;
+                loser.isDead = true;
+
+                Animator anim = loser.GetComponentInChildren<Animator>();
+                if (anim != null)
+                {
+                    anim.SetBool("IsDead", true);
+                    anim.SetTrigger("Damage");
+                }
+            }
+
+            Debug.Log($"タイムアップ！ プレイヤー {winnerID} の勝利！（敗者: P{loserID}）");
+
+            if (HUDManager.Instance != null)
+            {
+                HUDManager.Instance.ShowGameResult(winnerID);
+            }
         }
 
         // どちらかのキャラクターが倒れた時に呼び出されるメソッド

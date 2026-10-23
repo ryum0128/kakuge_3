@@ -183,12 +183,15 @@ namespace FightingGameBase
                     }
                     else if (attackMode == AttackMode.Special)
                     {
-                        Debug.Log("[SandbagAI] Dummy triggers auto-attack special.");
-                        dummyCharacter.AttackSpecial();
+                        if (!dummyCharacter.IsSpecialSilenced())
+                        {
+                            Debug.Log("[SandbagAI] Dummy triggers auto-attack special.");
+                            dummyCharacter.AttackSpecial();
+                        }
                     }
 
                     // Only trigger fallback weapon swing if base character without specialized script
-                    if (dummyCharacter.GetType() == typeof(CharacterBase))
+                    if (dummyCharacter.GetType() == typeof(CharacterBase) && (attackMode != AttackMode.Special || !dummyCharacter.IsSpecialSilenced()))
                     {
                         TriggerWeaponSwing();
                     }

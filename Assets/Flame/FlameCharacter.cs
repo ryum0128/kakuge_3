@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System.Collections;
 
 namespace FightingGameBase
@@ -798,9 +798,24 @@ namespace FightingGameBase
         // 3秒: ダメージ25, マナ25, 特大（今までと同じ最大威力）
         // =========================================================
 
+        public override bool IsInParryWindow() => isParrying;
+        public override bool IsInGuardBreak() => isGuardBroken;
+        public override float GetParryCooldownRemaining()
+        {
+            float elapsed = Time.time - lastParryTime;
+            if (elapsed < parryCooldown) return parryCooldown - elapsed;
+            return 0f;
+        }
+
         public override void AttackSpecial()
         {
             if (isDead || isAttacking || isSpecialAttacking || isBlocking || isGuardBroken || isDashingOrEvading || IsHurtLocked) return;
+
+            if (IsSpecialSilenced())
+            {
+                Debug.Log("[Flame] 影の領域（沈黙フィールド）内にいるため、スペシャル攻撃を使用できません！");
+                return;
+            }
 
             if (currentMana < specialManaCostLv1)
             {

@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace FightingGameBase
 {
@@ -172,7 +172,7 @@ namespace FightingGameBase
         }
 
         // 基底クラスの Start() をオーバーライド（継承の初期化とコールバック登録）
-        void Start()
+        protected override void Start()
         {
             base.Start();
 
@@ -204,7 +204,7 @@ namespace FightingGameBase
             chargeGauge = 0f;
         }
 
-        void Update()
+        protected override void Update()
         {
             if (isDead || GameManager.Instance != null && !GameManager.Instance.IsPlaying) return;
 
@@ -448,7 +448,7 @@ namespace FightingGameBase
 
 
         // ActivateHitboxTemporarily はお手本（CharacterBase）と同じ仕組みです
-        private System.Collections.IEnumerator ActivateHitboxTemporarily(GameObject hitboxObj, float duration)
+        protected new System.Collections.IEnumerator ActivateHitboxTemporarily(GameObject hitboxObj, float duration)
         {
             hitboxObj.SetActive(true);  // 攻撃判定をオン
             yield return new WaitForSeconds(duration);

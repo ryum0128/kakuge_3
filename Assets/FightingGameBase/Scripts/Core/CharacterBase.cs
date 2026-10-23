@@ -310,9 +310,84 @@ namespace FightingGameBase
             hitboxObj.SetActive(false);
         }
 
+        /// <summary>
+        /// 影の領域（沈黙フィールド）内にいるかどうかを判定します。
+        /// 領域内にいる間は、自身を含めすべてのキャラクターのスペシャル攻撃が使用不可になります。
+        /// </summary>
+        public virtual bool IsSpecialSilenced()
+        {
+            return ShadowDomainField.IsPositionInSilenceField(transform.position);
+        }
+
+        /// <summary>
+        /// キャラクターの全体的（スペシャル等）なクールダウンの残り時間（秒）を取得します。
+        /// </summary>
+        public virtual float GetCooldownRemaining()
+        {
+            return 0f;
+        }
+
+        /// <summary>
+        /// キャラクターのクールダウン最大時間（秒）を取得します。
+        /// </summary>
+        public virtual float GetCooldownDuration()
+        {
+            return 0f;
+        }
+
+        /// <summary>
+        /// HUD表示用のクールダウン状態文字列を取得します。
+        /// </summary>
+        public virtual string GetCooldownStatusText()
+        {
+            if (IsSpecialSilenced())
+            {
+                return "<color=#cc44ff>封印中</color>";
+            }
+
+            float remaining = GetCooldownRemaining();
+            if (remaining > 0.05f)
+            {
+                return $"<color=#ffaa00>{remaining:F1}s</color>";
+            }
+            return "<color=#00ff88>READY</color>";
+        }
+
+        /// <summary>
+        /// パリー受付中（パリーウィンドウ有効中）かどうか
+        /// </summary>
+        public virtual bool IsInParryWindow() => false;
+
+        /// <summary>
+        /// パリーのクールダウン残り時間（秒）
+        /// </summary>
+        public virtual float GetParryCooldownRemaining() => 0f;
+
+        /// <summary>
+        /// ガードブレイク中かどうか
+        /// </summary>
+        public virtual bool IsInGuardBreak() => false;
+
+        /// <summary>
+        /// HUD表示用のパリー状態テキスト
+        /// </summary>
+        public virtual string GetParryStatusText()
+        {
+            if (IsInGuardBreak()) return "<color=#ff3333>BREAK</color>";
+            if (IsInParryWindow()) return "<color=#ffee33>PARRY!</color>";
+            float cd = GetParryCooldownRemaining();
+            if (cd > 0.05f) return $"<color=#ff7722>{cd:F1}s</color>";
+            return "<color=#00e5ff>READY</color>";
+        }
+
         public virtual void AttackSpecial()
         {
             if (isDead || isStunned) return;
+            if (IsSpecialSilenced())
+            {
+                Debug.Log($"[Silence] {name} は影の領域（沈黙フィールド）内にいるためスペシャル攻撃を使用できない！");
+                return;
+            }
             SafeSetTrigger("AttackSpecial");
             Debug.Log("Special attack triggered.");
         }

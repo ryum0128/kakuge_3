@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace FightingGameBase
@@ -37,7 +37,7 @@ namespace FightingGameBase
         private float lastZPressTime = -1f;
         private float lastXPressTime = -1f;
         private bool isUltimateTriggered = false;
-        private float chargeTimer = 0f; // ★チャージ時間の計測用
+        // private float chargeTimer = 0f;
 
         private bool keysInitialized = false;
 

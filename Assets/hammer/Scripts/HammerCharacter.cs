@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace FightingGameBase
 {
@@ -82,7 +82,7 @@ namespace FightingGameBase
             visualsTransform = transform.Find("Visuals");
         }
 
-        void Start()
+        protected override void Start()
         {
             base.Start();
 
@@ -121,7 +121,7 @@ namespace FightingGameBase
             if (h4 != null) h4.gameObject.SetActive(false);
         }
 
-        void Update()
+        protected override void Update()
         {
             if (isDead || GameManager.Instance != null && !GameManager.Instance.IsPlaying) return;
 
@@ -329,7 +329,7 @@ namespace FightingGameBase
             return GetComponentInChildren<Hitbox>(true);
         }
 
-        private System.Collections.IEnumerator ActivateHitboxTemporarily(GameObject hitboxObj, float duration)
+        protected new System.Collections.IEnumerator ActivateHitboxTemporarily(GameObject hitboxObj, float duration)
         {
             hitboxObj.SetActive(true);
             yield return new WaitForSeconds(duration);

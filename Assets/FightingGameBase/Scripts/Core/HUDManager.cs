@@ -20,6 +20,7 @@ namespace FightingGameBase
         private class ProgressBarUI
         {
             public string name;
+            public bool isManaBar = false;
             public RectTransform bgRect;
             public RectTransform catchUpRect;
             public RectTransform fillRect;
@@ -33,21 +34,32 @@ namespace FightingGameBase
         private ProgressBarUI p1HpBar;
         private ProgressBarUI p1PostureBar;
         private ProgressBarUI p1ManaBar;
+        private ProgressBarUI p1CooldownBar;
 
         private ProgressBarUI p2HpBar;
         private ProgressBarUI p2PostureBar;
         private ProgressBarUI p2ManaBar;
+        private ProgressBarUI p2CooldownBar;
 
         // Text references
         private Text p1NameText;
         private Text p2NameText;
         private Text p1HpValueText;
         private Text p2HpValueText;
+        private Text p1ManaValueText;
+        private Text p2ManaValueText;
+        private Text p1CooldownValueText;
+        private Text p2CooldownValueText;
+        private Text p1SideParryText;
+        private Text p1SideSkillText;
+        private Text p2SideParryText;
+        private Text p2SideSkillText;
 
         // Timer
         private Text timerText;
         private float roundTimeRemaining = 99f;
         private bool isTimerActive = true;
+        private bool isTimeUp = false;
 
         // Stock / Lives icons
         private GameObject p1StockContainer;
@@ -108,6 +120,8 @@ namespace FightingGameBase
         private Sprite p2PostureGradient;
         private Sprite p1ManaGradient;
         private Sprite p2ManaGradient;
+        private Sprite p1CooldownGradient;
+        private Sprite p2CooldownGradient;
 
         void Awake()
         {
@@ -222,6 +236,10 @@ namespace FightingGameBase
             // Mana: Dark Blue to Bright Cyan
             p1ManaGradient = CreateGradientSprite(new Color(0.05f, 0.25f, 0.85f), new Color(0.1f, 0.75f, 1.0f));
             p2ManaGradient = CreateGradientSprite(new Color(0.1f, 0.75f, 1.0f), new Color(0.05f, 0.25f, 0.85f));
+
+            // Cooldown: Amber Orange to Golden Yellow
+            p1CooldownGradient = CreateGradientSprite(new Color(0.85f, 0.45f, 0.05f), new Color(1.0f, 0.85f, 0.2f));
+            p2CooldownGradient = CreateGradientSprite(new Color(1.0f, 0.85f, 0.2f), new Color(0.85f, 0.45f, 0.05f));
         }
 
         void SetLayerRecursively(GameObject obj, int newLayer)
@@ -257,7 +275,7 @@ namespace FightingGameBase
             headerRect.anchorMax = new Vector2(0.5f, 1.0f);
             headerRect.pivot = new Vector2(0.5f, 1.0f);
             headerRect.anchoredPosition = new Vector2(0, 0);
-            headerRect.sizeDelta = new Vector2(800, 110);
+            headerRect.sizeDelta = new Vector2(960, 126);
 
             // Glassmorphic translucent dark background
             Image headerBg = hudHeader.AddComponent<Image>();
@@ -311,10 +329,16 @@ namespace FightingGameBase
             p1HpValueText = CreateTextWithShadow(hudHeader, "P1_HP_Value", "100%", new Vector2(-50, -60), 12, Color.white, uiFont, TextAnchor.MiddleRight, new Vector2(0.5f, 1.0f), new Vector2(1.0f, 0.5f), 80);
             p1PostureBar = CreateProgressBar(hudHeader, "P1_Posture_Bar", new Vector2(-325, -83), new Vector2(280, 8), p1PostureGradient, false);
             p1ManaBar = CreateProgressBar(hudHeader, "P1_Mana_Bar", new Vector2(-325, -94), new Vector2(280, 8), p1ManaGradient, false);
+            p1ManaValueText = CreateTextWithShadow(hudHeader, "P1_Mana_Value", "100%", new Vector2(-50, -94), 10, new Color(0.2f, 0.9f, 1.0f, 1.0f), uiFont, TextAnchor.MiddleRight, new Vector2(0.5f, 1.0f), new Vector2(1.0f, 0.5f), 80);
+            p1CooldownBar = CreateProgressBar(hudHeader, "P1_CD_Bar", new Vector2(-325, -106), new Vector2(280, 8), p1CooldownGradient, false);
+            p1CooldownBar.isManaBar = true;
+            p1CooldownValueText = CreateTextWithShadow(hudHeader, "P1_CD_Value", "READY", new Vector2(-50, -106), 10, new Color(0.3f, 1.0f, 0.5f, 1.0f), uiFont, TextAnchor.MiddleRight, new Vector2(0.5f, 1.0f), new Vector2(1.0f, 0.5f), 100);
 
             CreateLabel(hudHeader, "P1_HP_Label", "HP", new Vector2(-320, -60), 9, new Color(1f, 1f, 1f, 0.75f), uiFont, TextAnchor.MiddleLeft, new Vector2(0.5f, 1.0f));
             CreateLabel(hudHeader, "P1_Posture_Label", "POSTURE", new Vector2(-320, -83), 7, new Color(1f, 1f, 1f, 0.75f), uiFont, TextAnchor.MiddleLeft, new Vector2(0.5f, 1.0f));
-            CreateLabel(hudHeader, "P1_Mana_Label", "MANA", new Vector2(-320, -94), 7, new Color(1f, 1f, 1f, 0.75f), uiFont, TextAnchor.MiddleLeft, new Vector2(0.5f, 1.0f));
+            CreateLabel(hudHeader, "P1_Mana_Label", "MANA", new Vector2(-320, -94), 7, new Color(0.2f, 0.9f, 1.0f, 0.85f), uiFont, TextAnchor.MiddleLeft, new Vector2(0.5f, 1.0f));
+            CreateLabel(hudHeader, "P1_CD_Label", "COOLDOWN", new Vector2(-320, -106), 7, new Color(1.0f, 0.85f, 0.2f, 0.85f), uiFont, TextAnchor.MiddleLeft, new Vector2(0.5f, 1.0f));
+            CreateSideCooldownBadge(hudHeader, "P1_CD_SideBadge", new Vector2(-335, -83), false, uiFont, out p1SideParryText, out p1SideSkillText);
 
             // 5. Create P2 HUD elements (Right side, pivot grows rightwards from center)
             p2NameText = CreateTextWithShadow(hudHeader, "P2_Name", "PLAYER 2", new Vector2(320, -12), 22, Color.white, uiFont, TextAnchor.MiddleRight, new Vector2(0.5f, 1.0f), new Vector2(1.0f, 1.0f));
@@ -322,10 +346,16 @@ namespace FightingGameBase
             p2HpValueText = CreateTextWithShadow(hudHeader, "P2_HP_Value", "100%", new Vector2(50, -60), 12, Color.white, uiFont, TextAnchor.MiddleLeft, new Vector2(0.5f, 1.0f), new Vector2(0.0f, 0.5f), 80);
             p2PostureBar = CreateProgressBar(hudHeader, "P2_Posture_Bar", new Vector2(325, -83), new Vector2(280, 8), p2PostureGradient, true);
             p2ManaBar = CreateProgressBar(hudHeader, "P2_Mana_Bar", new Vector2(325, -94), new Vector2(280, 8), p2ManaGradient, true);
+            p2ManaValueText = CreateTextWithShadow(hudHeader, "P2_Mana_Value", "100%", new Vector2(50, -94), 10, new Color(0.2f, 0.9f, 1.0f, 1.0f), uiFont, TextAnchor.MiddleLeft, new Vector2(0.5f, 1.0f), new Vector2(0.0f, 0.5f), 80);
+            p2CooldownBar = CreateProgressBar(hudHeader, "P2_CD_Bar", new Vector2(325, -106), new Vector2(280, 8), p2CooldownGradient, true);
+            p2CooldownBar.isManaBar = true;
+            p2CooldownValueText = CreateTextWithShadow(hudHeader, "P2_CD_Value", "READY", new Vector2(50, -106), 10, new Color(0.3f, 1.0f, 0.5f, 1.0f), uiFont, TextAnchor.MiddleLeft, new Vector2(0.5f, 1.0f), new Vector2(0.0f, 0.5f), 100);
 
             CreateLabel(hudHeader, "P2_HP_Label", "HP", new Vector2(320, -60), 9, new Color(1f, 1f, 1f, 0.75f), uiFont, TextAnchor.MiddleRight, new Vector2(0.5f, 1.0f));
             CreateLabel(hudHeader, "P2_Posture_Label", "POSTURE", new Vector2(320, -83), 7, new Color(1f, 1f, 1f, 0.75f), uiFont, TextAnchor.MiddleRight, new Vector2(0.5f, 1.0f));
-            CreateLabel(hudHeader, "P2_Mana_Label", "MANA", new Vector2(320, -94), 7, new Color(1f, 1f, 1f, 0.75f), uiFont, TextAnchor.MiddleRight, new Vector2(0.5f, 1.0f));
+            CreateLabel(hudHeader, "P2_Mana_Label", "MANA", new Vector2(320, -94), 7, new Color(0.2f, 0.9f, 1.0f, 0.85f), uiFont, TextAnchor.MiddleRight, new Vector2(0.5f, 1.0f));
+            CreateLabel(hudHeader, "P2_CD_Label", "COOLDOWN", new Vector2(320, -106), 7, new Color(1.0f, 0.85f, 0.2f, 0.85f), uiFont, TextAnchor.MiddleRight, new Vector2(0.5f, 1.0f));
+            CreateSideCooldownBadge(hudHeader, "P2_CD_SideBadge", new Vector2(335, -83), true, uiFont, out p2SideParryText, out p2SideSkillText);
 
             // 6. Create Stock / Lives icons
             p1StockContainer = CreateStockIcons(hudHeader, "P1_Stocks", new Vector2(-320, -38), false);
@@ -395,6 +425,104 @@ namespace FightingGameBase
             Shadow shadow = labelObj.AddComponent<Shadow>();
             shadow.effectColor = new Color(0f, 0f, 0f, 0.6f);
             shadow.effectDistance = new Vector2(1f, -1f);
+        }
+
+        private GameObject CreateSideCooldownBadge(GameObject parent, string name, Vector2 pos, bool isP2, Font uiFont, out Text parryValText, out Text skillValText)
+        {
+            GameObject badge = new GameObject(name);
+            badge.transform.SetParent(parent.transform, false);
+            RectTransform rect = badge.AddComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 1.0f);
+            rect.anchorMax = new Vector2(0.5f, 1.0f);
+            rect.pivot = isP2 ? new Vector2(0f, 0.5f) : new Vector2(1f, 0.5f);
+            rect.anchoredPosition = pos;
+            rect.sizeDelta = new Vector2(120, 56);
+
+            // Translucent container background
+            Image bg = badge.AddComponent<Image>();
+            bg.color = new Color(0.06f, 0.08f, 0.12f, 0.85f);
+
+            // Subtle outer accent line (top border)
+            GameObject topAccent = new GameObject(name + "_TopAccent");
+            topAccent.transform.SetParent(badge.transform, false);
+            RectTransform accentRect = topAccent.AddComponent<RectTransform>();
+            accentRect.anchorMin = new Vector2(0f, 1f);
+            accentRect.anchorMax = new Vector2(1f, 1f);
+            accentRect.pivot = new Vector2(0.5f, 1f);
+            accentRect.anchoredPosition = Vector2.zero;
+            accentRect.sizeDelta = new Vector2(0, 2);
+            Image accentImg = topAccent.AddComponent<Image>();
+            accentImg.color = isP2 ? new Color(1.0f, 0.45f, 0.1f, 0.8f) : new Color(0.1f, 0.75f, 1.0f, 0.8f);
+
+            // Row 1: Parry, Row 2: Skill
+            if (!isP2)
+            {
+                CreateBadgeLabel(badge, "Parry_Label", "PARRY", new Vector2(-54, 12), uiFont, TextAnchor.MiddleLeft);
+                parryValText = CreateBadgeValue(badge, "Parry_Val", "READY", new Vector2(54, 12), new Color(0f, 0.9f, 1f), uiFont, TextAnchor.MiddleRight);
+
+                CreateBadgeLabel(badge, "Skill_Label", "SKILL", new Vector2(-54, -12), uiFont, TextAnchor.MiddleLeft);
+                skillValText = CreateBadgeValue(badge, "Skill_Val", "READY", new Vector2(54, -12), new Color(0.3f, 1f, 0.5f), uiFont, TextAnchor.MiddleRight);
+            }
+            else
+            {
+                parryValText = CreateBadgeValue(badge, "Parry_Val", "READY", new Vector2(-54, 12), new Color(0f, 0.9f, 1f), uiFont, TextAnchor.MiddleLeft);
+                CreateBadgeLabel(badge, "Parry_Label", "PARRY", new Vector2(54, 12), uiFont, TextAnchor.MiddleRight);
+
+                skillValText = CreateBadgeValue(badge, "Skill_Val", "READY", new Vector2(-54, -12), new Color(0.3f, 1f, 0.5f), uiFont, TextAnchor.MiddleLeft);
+                CreateBadgeLabel(badge, "Skill_Label", "SKILL", new Vector2(54, -12), uiFont, TextAnchor.MiddleRight);
+            }
+
+            return badge;
+        }
+
+        private Text CreateBadgeLabel(GameObject parent, string name, string text, Vector2 anchoredPos, Font uiFont, TextAnchor align)
+        {
+            GameObject obj = new GameObject(name);
+            obj.transform.SetParent(parent.transform, false);
+            RectTransform rect = obj.AddComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = (align == TextAnchor.MiddleLeft) ? new Vector2(0f, 0.5f) : new Vector2(1f, 0.5f);
+            rect.anchoredPosition = anchoredPos;
+            rect.sizeDelta = new Vector2(50, 18);
+
+            Text t = obj.AddComponent<Text>();
+            t.font = uiFont;
+            t.text = text;
+            t.fontSize = 9;
+            t.color = new Color(0.75f, 0.8f, 0.85f, 0.85f);
+            t.fontStyle = FontStyle.Bold;
+            t.alignment = align;
+
+            Shadow s = obj.AddComponent<Shadow>();
+            s.effectColor = new Color(0, 0, 0, 0.8f);
+            s.effectDistance = new Vector2(1, -1);
+            return t;
+        }
+
+        private Text CreateBadgeValue(GameObject parent, string name, string text, Vector2 anchoredPos, Color col, Font uiFont, TextAnchor align)
+        {
+            GameObject obj = new GameObject(name);
+            obj.transform.SetParent(parent.transform, false);
+            RectTransform rect = obj.AddComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = (align == TextAnchor.MiddleLeft) ? new Vector2(0f, 0.5f) : new Vector2(1f, 0.5f);
+            rect.anchoredPosition = anchoredPos;
+            rect.sizeDelta = new Vector2(55, 20);
+
+            Text t = obj.AddComponent<Text>();
+            t.font = uiFont;
+            t.text = text;
+            t.fontSize = 11;
+            t.color = col;
+            t.fontStyle = FontStyle.Bold;
+            t.alignment = align;
+
+            Shadow s = obj.AddComponent<Shadow>();
+            s.effectColor = new Color(0, 0, 0, 0.9f);
+            s.effectDistance = new Vector2(1.5f, -1.5f);
+            return t;
         }
 
         private ProgressBarUI CreateProgressBar(GameObject parent, string name, Vector2 pos, Vector2 size, Sprite gradientSprite, bool isP2)
@@ -472,7 +600,16 @@ namespace FightingGameBase
             catchUpRect.sizeDelta = new Vector2(size.x, 0f);
 
             Image catchUpImg = catchUpObj.AddComponent<Image>();
-            catchUpImg.color = new Color(0.85f, 0.2f, 0.12f, 0.9f); // Red warning color
+            bar.name = name;
+            bar.isManaBar = name.Contains("Mana");
+            if (bar.isManaBar)
+            {
+                catchUpImg.color = new Color(0.05f, 0.20f, 0.40f, 0.4f); // マナは赤ではなく背景に馴染むダークブルー
+            }
+            else
+            {
+                catchUpImg.color = new Color(0.85f, 0.2f, 0.12f, 0.9f); // Red warning color
+            }
             bar.catchUpRect = catchUpRect;
             bar.catchUpImage = catchUpImg;
 
@@ -702,8 +839,11 @@ namespace FightingGameBase
             }
             overlayImg.color = new Color(0f, 0f, 0f, 0.6f);
 
-            // --- K.O. テキスト ---
-            Text koText = CreateTextWithShadow(overlay, "KO_Text", "K.O.", new Vector2(0, 30), 72, new Color(1f, 0.2f, 0.15f), uiFont, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), 500);
+            // --- K.O. または TIME UP! テキスト ---
+            string bannerTitle = isTimeUp ? "TIME UP!" : "K.O.";
+            Color bannerColor = isTimeUp ? new Color(1.0f, 0.85f, 0.2f) : new Color(1f, 0.2f, 0.15f);
+            int bannerFontSize = isTimeUp ? 60 : 72;
+            Text koText = CreateTextWithShadow(overlay, "KO_Text", bannerTitle, new Vector2(0, 30), bannerFontSize, bannerColor, uiFont, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), 600);
 
             // K.O. ポップインアニメーション
             elapsed = 0f;
@@ -735,28 +875,36 @@ namespace FightingGameBase
             {
                 elapsed += Time.unscaledDeltaTime;
                 float a = 1f - (elapsed / koFadeDur);
-                koText.color = new Color(1f, 0.2f, 0.15f, a);
+                koText.color = new Color(bannerColor.r, bannerColor.g, bannerColor.b, a);
                 yield return null;
             }
             koText.gameObject.SetActive(false);
 
             // --- 勝者テキスト ---
             string winnerName = "";
-            CharacterBase[] allChars = FindObjectsByType<CharacterBase>(FindObjectsSortMode.None);
-            foreach (CharacterBase c in allChars)
+            if (winnerID != 0)
             {
-                if (c.playerID == winnerID)
+                CharacterBase[] allChars = FindObjectsByType<CharacterBase>(FindObjectsSortMode.None);
+                foreach (CharacterBase c in allChars)
                 {
-                    winnerName = c.gameObject.name.Replace("(Clone)", "").ToUpper();
-                    break;
+                    if (c.playerID == winnerID)
+                    {
+                        winnerName = c.gameObject.name.Replace("(Clone)", "").ToUpper();
+                        break;
+                    }
                 }
             }
 
-            Color winColor = winnerID == 1 ? new Color(0.15f, 0.85f, 1f) : new Color(1f, 0.5f, 0.15f);
-            Text winText = CreateTextWithShadow(overlay, "Winner_Text", $"PLAYER {winnerID}  WIN!", new Vector2(0, 20), 52, winColor, uiFont, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), 600);
+            string winString = (winnerID == 0) ? "DRAW GAME" : $"PLAYER {winnerID}  WIN!";
+            Color winColor = (winnerID == 0) ? new Color(1f, 0.85f, 0.2f) : (winnerID == 1 ? new Color(0.15f, 0.85f, 1f) : new Color(1f, 0.5f, 0.15f));
+            Text winText = CreateTextWithShadow(overlay, "Winner_Text", winString, new Vector2(0, 20), 52, winColor, uiFont, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), 600);
             
-            // キャラ名を下に表示
-            Text nameText = CreateTextWithShadow(overlay, "Winner_Name", winnerName, new Vector2(0, -30), 28, new Color(1f, 0.85f, 0.2f), uiFont, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), 500);
+            // キャラ名を下に表示（引き分けでない場合のみ）
+            Text nameText = null;
+            if (winnerID != 0 && !string.IsNullOrEmpty(winnerName))
+            {
+                nameText = CreateTextWithShadow(overlay, "Winner_Name", winnerName, new Vector2(0, -30), 28, new Color(1f, 0.85f, 0.2f), uiFont, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), 500);
+            }
 
             // 勝者テキストのスライドイン
             elapsed = 0f;
@@ -769,8 +917,11 @@ namespace FightingGameBase
                 float x = Mathf.Lerp(-400f, 0f, Mathf.SmoothStep(0f, 1f, t));
                 winText.rectTransform.anchoredPosition = new Vector2(x, 20);
                 // 右からスライドイン（キャラ名）
-                float x2 = Mathf.Lerp(400f, 0f, Mathf.SmoothStep(0f, 1f, t));
-                nameText.rectTransform.anchoredPosition = new Vector2(x2, -30);
+                if (nameText != null)
+                {
+                    float x2 = Mathf.Lerp(400f, 0f, Mathf.SmoothStep(0f, 1f, t));
+                    nameText.rectTransform.anchoredPosition = new Vector2(x2, -30);
+                }
                 yield return null;
             }
 
@@ -845,6 +996,10 @@ namespace FightingGameBase
                 respawnNotifyText.gameObject.SetActive(false);
             }
 
+            roundTimeRemaining = 99f;
+            isTimerActive = true;
+            isTimeUp = false;
+
             player1 = null;
             player2 = null;
         }
@@ -869,7 +1024,12 @@ namespace FightingGameBase
             bar.fillRect.sizeDelta = new Vector2(targetWidth, 0f);
 
             // Lerp catchup bar
-            if (bar.catchUpPercent > bar.currentPercent)
+            if (bar.isManaBar)
+            {
+                // マナバーは消費を即座にUIへ反映（赤色残像で満タンに見えるのを防ぐ）
+                bar.catchUpPercent = bar.currentPercent;
+            }
+            else if (bar.catchUpPercent > bar.currentPercent)
             {
                 bar.catchUpPercent = Mathf.MoveTowards(bar.catchUpPercent, bar.currentPercent, Time.deltaTime * 0.35f);
             }
@@ -1143,24 +1303,10 @@ namespace FightingGameBase
                 {
                     roundTimeRemaining = 0;
                     isTimerActive = false;
+                    isTimeUp = true;
                     
-                    // Time out resolution: player with lower HP loses
-                    if (player1 != null && player2 != null)
-                    {
-                        if (player1.currentHP < player2.currentHP)
-                        {
-                            player1.TakeDamage(player1.maxHP);
-                        }
-                        else if (player2.currentHP < player1.currentHP)
-                        {
-                            player2.TakeDamage(player2.maxHP);
-                        }
-                        else
-                        {
-                            player1.TakeDamage(player1.maxHP);
-                            player2.TakeDamage(player2.maxHP);
-                        }
-                    }
+                    // タイムアップ判定: 体力とストック数が少ない方が負け
+                    ResolveTimeUp();
                 }
             }
 
@@ -1172,12 +1318,18 @@ namespace FightingGameBase
                 {
                     timerText.color = new Color(1.0f, 0.25f, 0.25f);
                     float pulse = 1f + Mathf.PingPong(Time.time * 4f, 0.15f);
-                    timerText.transform.parent.localScale = new Vector3(pulse, pulse, 1f);
+                    if (timerText.transform.parent != null)
+                    {
+                        timerText.transform.parent.localScale = new Vector3(pulse, pulse, 1f);
+                    }
                 }
                 else
                 {
                     timerText.color = new Color(1.0f, 0.85f, 0.2f);
-                    timerText.transform.parent.localScale = Vector3.one;
+                    if (timerText.transform.parent != null)
+                    {
+                        timerText.transform.parent.localScale = Vector3.one;
+                    }
                 }
             }
 
@@ -1208,14 +1360,47 @@ namespace FightingGameBase
                 float manaPercent = player1.currentMana / maxMana;
                 SetBarValue(p1ManaBar, manaPercent);
 
-                // Low HP alarm flash
-                if (hpPercent < 0.3f && player1.currentHP > 0)
+                if (p1ManaValueText != null)
                 {
-                    p1HpBar.fillImage.color = Color.Lerp(Color.white, new Color(1.0f, 0.3f, 0.2f), Mathf.PingPong(Time.time * 6f, 1.0f));
+                    int manaPercentInt = Mathf.CeilToInt(manaPercent * 100f);
+                    p1ManaValueText.text = $"{manaPercentInt}%";
                 }
-                else
+
+                // Cooldown Bar & Text 更新
+                float p1CdDuration = player1.GetCooldownDuration();
+                float p1CdRemaining = player1.GetCooldownRemaining();
+                float p1CdPercent = 1.0f;
+                if (p1CdDuration > 0.01f)
                 {
-                    p1HpBar.fillImage.color = Color.white;
+                    p1CdPercent = Mathf.Clamp01(1.0f - (p1CdRemaining / p1CdDuration));
+                }
+                SetBarValue(p1CooldownBar, p1CdPercent);
+
+                if (p1CooldownValueText != null)
+                {
+                    p1CooldownValueText.text = player1.GetCooldownStatusText();
+                }
+
+                if (p1SideParryText != null)
+                {
+                    p1SideParryText.text = player1.GetParryStatusText();
+                }
+                if (p1SideSkillText != null)
+                {
+                    p1SideSkillText.text = player1.GetCooldownStatusText();
+                }
+
+                // Low HP alarm flash
+                if (p1HpBar != null && p1HpBar.fillImage != null)
+                {
+                    if (hpPercent < 0.3f && player1.currentHP > 0)
+                    {
+                        p1HpBar.fillImage.color = Color.Lerp(Color.white, new Color(1.0f, 0.3f, 0.2f), Mathf.PingPong(Time.time * 6f, 1.0f));
+                    }
+                    else
+                    {
+                        p1HpBar.fillImage.color = Color.white;
+                    }
                 }
 
                 // ストック表示の更新
@@ -1226,9 +1411,26 @@ namespace FightingGameBase
                 SetBarValue(p1HpBar, 0f);
                 SetBarValue(p1PostureBar, 0f);
                 SetBarValue(p1ManaBar, 0f);
+                SetBarValue(p1CooldownBar, 0f);
                 if (p1HpValueText != null)
                 {
                     p1HpValueText.text = "0%";
+                }
+                if (p1ManaValueText != null)
+                {
+                    p1ManaValueText.text = "0%";
+                }
+                if (p1CooldownValueText != null)
+                {
+                    p1CooldownValueText.text = "";
+                }
+                if (p1SideParryText != null)
+                {
+                    p1SideParryText.text = "";
+                }
+                if (p1SideSkillText != null)
+                {
+                    p1SideSkillText.text = "";
                 }
             }
 
@@ -1259,14 +1461,47 @@ namespace FightingGameBase
                 float manaPercent = player2.currentMana / maxMana;
                 SetBarValue(p2ManaBar, manaPercent);
 
-                // Low HP alarm flash
-                if (hpPercent < 0.3f && player2.currentHP > 0)
+                if (p2ManaValueText != null)
                 {
-                    p2HpBar.fillImage.color = Color.Lerp(Color.white, new Color(1.0f, 0.3f, 0.2f), Mathf.PingPong(Time.time * 6f, 1.0f));
+                    int manaPercentInt = Mathf.CeilToInt(manaPercent * 100f);
+                    p2ManaValueText.text = $"{manaPercentInt}%";
                 }
-                else
+
+                // Cooldown Bar & Text 更新
+                float p2CdDuration = player2.GetCooldownDuration();
+                float p2CdRemaining = player2.GetCooldownRemaining();
+                float p2CdPercent = 1.0f;
+                if (p2CdDuration > 0.01f)
                 {
-                    p2HpBar.fillImage.color = Color.white;
+                    p2CdPercent = Mathf.Clamp01(1.0f - (p2CdRemaining / p2CdDuration));
+                }
+                SetBarValue(p2CooldownBar, p2CdPercent);
+
+                if (p2CooldownValueText != null)
+                {
+                    p2CooldownValueText.text = player2.GetCooldownStatusText();
+                }
+
+                if (p2SideParryText != null)
+                {
+                    p2SideParryText.text = player2.GetParryStatusText();
+                }
+                if (p2SideSkillText != null)
+                {
+                    p2SideSkillText.text = player2.GetCooldownStatusText();
+                }
+
+                // Low HP alarm flash
+                if (p2HpBar != null && p2HpBar.fillImage != null)
+                {
+                    if (hpPercent < 0.3f && player2.currentHP > 0)
+                    {
+                        p2HpBar.fillImage.color = Color.Lerp(Color.white, new Color(1.0f, 0.3f, 0.2f), Mathf.PingPong(Time.time * 6f, 1.0f));
+                    }
+                    else
+                    {
+                        p2HpBar.fillImage.color = Color.white;
+                    }
                 }
 
                 // ストック表示の更新
@@ -1277,10 +1512,98 @@ namespace FightingGameBase
                 SetBarValue(p2HpBar, 0f);
                 SetBarValue(p2PostureBar, 0f);
                 SetBarValue(p2ManaBar, 0f);
+                SetBarValue(p2CooldownBar, 0f);
                 if (p2HpValueText != null)
                 {
                     p2HpValueText.text = "0%";
                 }
+                if (p2ManaValueText != null)
+                {
+                    p2ManaValueText.text = "0%";
+                }
+                if (p2CooldownValueText != null)
+                {
+                    p2CooldownValueText.text = "";
+                }
+                if (p2SideParryText != null)
+                {
+                    p2SideParryText.text = "";
+                }
+                if (p2SideSkillText != null)
+                {
+                    p2SideSkillText.text = "";
+                }
+            }
+        }
+
+        /// <summary>
+        /// タイムアップ時の勝敗判定。
+        /// 1. ストック数（残機）が多い方が勝ち（少ない方が負け）
+        /// 2. ストック数が同数の場合、現在の体力（HP）が多い方が勝ち（少ない方が負け）
+        /// 3. ストック数・体力ともに同点の場合は引き分け
+        /// </summary>
+        private void ResolveTimeUp()
+        {
+            if (player1 == null || player2 == null)
+            {
+                FindPlayers();
+            }
+
+            if (player1 == null && player2 == null) return;
+
+            int winnerID = 0;
+            int loserID = 0;
+
+            if (player1 != null && player2 == null)
+            {
+                winnerID = player1.playerID;
+                loserID = 2;
+            }
+            else if (player2 != null && player1 == null)
+            {
+                winnerID = player2.playerID;
+                loserID = 1;
+            }
+            else
+            {
+                // 1. まずストック数（残機）を比較
+                if (player1.remainingLives > player2.remainingLives)
+                {
+                    winnerID = player1.playerID;
+                    loserID = player2.playerID;
+                }
+                else if (player2.remainingLives > player1.remainingLives)
+                {
+                    winnerID = player2.playerID;
+                    loserID = player1.playerID;
+                }
+                else
+                {
+                    // 2. ストック数が同数の場合、現在の体力（HP）を比較
+                    if (player1.currentHP > player2.currentHP)
+                    {
+                        winnerID = player1.playerID;
+                        loserID = player2.playerID;
+                    }
+                    else if (player2.currentHP > player1.currentHP)
+                    {
+                        winnerID = player2.playerID;
+                        loserID = player1.playerID;
+                    }
+                    else
+                    {
+                        // 3. ストック数も体力も完全一致（引き分け）
+                        winnerID = 0;
+                        loserID = 0;
+                    }
+                }
+            }
+
+            Debug.Log($"[HUDManager] タイムアップ勝敗判定: 勝者 P{winnerID} / 敗者 P{loserID}");
+
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.OnTimeUpResult(winnerID, loserID);
             }
         }
     }

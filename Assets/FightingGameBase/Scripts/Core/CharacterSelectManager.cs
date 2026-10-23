@@ -5,7 +5,7 @@ namespace FightingGameBase
 {
     // =================================================================================
     // 【CharacterSelectManager（キャラクターセレクト画面）】
-    // 数字キー(1〜7)を使って、1P→2Pの順に武器を選択します。
+    // 数字キー(1〜4)を使って、1P→2Pの順に武器を選択します。
     // サンドバッグ（通常攻撃／スペシャル攻撃／停止）または2Pプレイヤー操作を選択可能。
     // =================================================================================
     public class CharacterSelectManager : MonoBehaviour
@@ -17,7 +17,7 @@ namespace FightingGameBase
             public GameObject prefab;
         }
 
-        [Header("選択できる武器一覧 (1〜7キーに対応)")]
+        [Header("選択できる武器一覧")]
         public WeaponEntry[] weapons;
 
         [Header("配置設定")]
@@ -100,19 +100,72 @@ namespace FightingGameBase
 
         public void EnsureWeaponsLoaded()
         {
+            // ガンランス・ハンマー・鞭・ライトセーバーを除外 & ダガー・炎の名称更新
+            if (weapons != null && weapons.Length > 0)
+            {
+                var filtered = new System.Collections.Generic.List<WeaponEntry>();
+                foreach (var w in weapons)
+                {
+                    if (w == null) continue;
+                    if (w.displayName == "ガンランス" || w.displayName == "ハンマー" ||
+                        w.displayName == "鞭" || w.displayName == "ライトセーバー")
+                    {
+                        continue;
+                    }
+                    if (w.displayName == "ダガー") w.displayName = "Dagger";
+                    if (w.displayName == "炎") w.displayName = "Flame";
+                    filtered.Add(w);
+                }
+                weapons = filtered.ToArray();
+            }
+
 #if UNITY_EDITOR
             if (weapons == null || weapons.Length == 0)
             {
+                string taikenPath = System.IO.File.Exists("Assets/TAIKEN/FloatingGreatsword.prefab")
+                    ? "Assets/TAIKEN/FloatingGreatsword.prefab"
+                    : (System.IO.File.Exists("Assets/TAIKEN/Taiken.prefab") ? "Assets/TAIKEN/Taiken.prefab" : "Assets/TAIKEN/FloatingGreatsword.prefab");
+
                 weapons = new[]
                 {
-                    MakeEntry("TAIKEN", "Assets/TAIKEN/Taiken.prefab"),
-                    MakeEntry("ダガー", "Assets/Dagger/Dagger.prefab"),
-                    MakeEntry("ライトセーバー", "Assets/ライトセーバー/LightsaberCharacter.prefab"),
-                    MakeEntry("鞭", "Assets/鞭/WhipCharacter.prefab"),
-                    MakeEntry("ハンマー", "Assets/hammer/Prefabs/HammerCharacter.prefab"),
-                    MakeEntry("ガンランス", "Assets/gannrannsu/Prefabs/GannrannsuCharacter.prefab"),
-                    MakeEntry("炎", "Assets/Flame/FlameCharacter.prefab"),
+                    MakeEntry("TAIKEN", taikenPath),
+                    MakeEntry("Dagger", "Assets/Dagger/Dagger.prefab"),
+                    MakeEntry("Flame", "Assets/Flame/FlameCharacter.prefab"),
+                    MakeEntry("Thunder", "Assets/Thunder/ThunderCharacter.prefab"),
+                    MakeEntry("Ice", "Assets/Ice/IceCharacter.prefab"),
+                    MakeEntry("Shadow", "Assets/Shadow/ShadowCharacter.prefab"),
                 };
+            }
+            else
+            {
+                var list = new System.Collections.Generic.List<WeaponEntry>(weapons);
+                bool modified = false;
+
+                bool hasThunder = list.Exists(w => w != null && w.displayName == "Thunder");
+                if (!hasThunder)
+                {
+                    list.Add(MakeEntry("Thunder", "Assets/Thunder/ThunderCharacter.prefab"));
+                    modified = true;
+                }
+
+                bool hasIce = list.Exists(w => w != null && w.displayName == "Ice");
+                if (!hasIce)
+                {
+                    list.Add(MakeEntry("Ice", "Assets/Ice/IceCharacter.prefab"));
+                    modified = true;
+                }
+
+                bool hasShadow = list.Exists(w => w != null && w.displayName == "Shadow");
+                if (!hasShadow)
+                {
+                    list.Add(MakeEntry("Shadow", "Assets/Shadow/ShadowCharacter.prefab"));
+                    modified = true;
+                }
+
+                if (modified)
+                {
+                    weapons = list.ToArray();
+                }
             }
 #endif
         }
@@ -203,7 +256,7 @@ namespace FightingGameBase
             }
 
             // ルートオブジェクトからもキャラクター関連プレハブを検出して確実に消去
-            string[] keywords = { "Flame", "TAIKEN", "Dagger", "Hammer", "Whip", "Lightsaber", "Gannrannsu", "Template" };
+            string[] keywords = { "Flame", "TAIKEN", "Dagger", "Hammer", "Whip", "Lightsaber", "Gannrannsu", "Template", "Thunder" };
             GameObject[] roots = UnityEngine.SceneManagement.SceneManager.GetActiveScene().GetRootGameObjects();
             foreach (var r in roots)
             {
@@ -288,10 +341,18 @@ namespace FightingGameBase
                 // プレイヤーのキー入力を無効化（誤操作・二重入力防止）
                 PlayerInputController pic = p2Go.GetComponent<PlayerInputController>();
                 if (pic != null) Destroy(pic);
-                var gic = p2Go.GetComponent<GannrannsuInputController>();
-                if (gic != null) Destroy(gic);
-                var hic = p2Go.GetComponent<HammerInputController>();
-                if (hic != null) Destroy(hic);
+
+                // 個別コントローラーがあれば削除
+                var otherControllers = p2Go.GetComponents<MonoBehaviour>();
+                foreach (var c in otherControllers)
+                {
+                    if (c == null) continue;
+                    string typeName = c.GetType().Name;
+                    if (typeName.EndsWith("InputController") && typeName != "GamepadInputController")
+                    {
+                        Destroy(c);
+                    }
+                }
 
                 SandbagAI sb = p2Go.GetComponent<SandbagAI>();
                 if (sb == null) sb = p2Go.AddComponent<SandbagAI>();
@@ -339,49 +400,7 @@ namespace FightingGameBase
                 pic.SetupKeys(playerID);
             }
 
-            // GannrannsuInputController
-            var gic = go.GetComponent<GannrannsuInputController>();
-            if (gic != null)
-            {
-                if (playerID == 1)
-                {
-                    gic.leftKey = Key.A;
-                    gic.rightKey = Key.D;
-                    gic.jumpKey = Key.W;
-                    gic.normalAttackKey = Key.K;
-                    gic.specialAttackKey = Key.L;
-                }
-                else
-                {
-                    gic.leftKey = Key.LeftArrow;
-                    gic.rightKey = Key.RightArrow;
-                    gic.jumpKey = Key.UpArrow;
-                    gic.normalAttackKey = Key.I;
-                    gic.specialAttackKey = Key.O;
-                }
-            }
-
-            // HammerInputController
-            var hic = go.GetComponent<HammerInputController>();
-            if (hic != null)
-            {
-                if (playerID == 1)
-                {
-                    hic.leftKey = Key.A;
-                    hic.rightKey = Key.D;
-                    hic.jumpKey = Key.W;
-                    hic.normalAttackKey = Key.K;
-                    hic.specialAttackKey = Key.L;
-                }
-                else
-                {
-                    hic.leftKey = Key.LeftArrow;
-                    hic.rightKey = Key.RightArrow;
-                    hic.jumpKey = Key.UpArrow;
-                    hic.normalAttackKey = Key.I;
-                    hic.specialAttackKey = Key.O;
-                }
-            }
+            // その他のコントローラーがあれば必要に応じて設定可能
         }
 
         private static void FaceDirection(Transform t, float sign)

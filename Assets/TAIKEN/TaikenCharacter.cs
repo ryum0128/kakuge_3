@@ -342,9 +342,25 @@ namespace FightingGameBase
         [Tooltip("Damage of the special attack.")]
         public int chargeSlashDamage = 30;
 
+        public override bool IsInParryWindow() => isParrying;
+        public override bool IsInGuardBreak() => isGuardBroken;
+        public override float GetParryCooldownRemaining()
+        {
+            float elapsed = Time.time - lastParryTime;
+            if (elapsed < parryCooldown) return parryCooldown - elapsed;
+            return 0f;
+        }
+
         public override void AttackSpecial()
         {
             if (isDead || isSwinging || isBlocking || isGuardBroken || isDashingOrEvading || IsHurtLocked) return;
+
+            if (IsSpecialSilenced())
+            {
+                Debug.Log("[Taiken] 影の領域（沈黙フィールド）内にいるため、スペシャル攻撃を使用できません！");
+                return;
+            }
+
             if (currentMana < 30f)
             {
                 Debug.Log("Not enough Mana for Special Attack!");
