@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using System.Collections;
 
 namespace FightingGameBase
@@ -318,6 +318,11 @@ namespace FightingGameBase
         {
             return ShadowDomainField.IsPositionInSilenceField(transform.position);
         }
+
+        /// <summary>
+        /// 騾壼ｸｸ謾ｻ謦・ｸｭ繧・せ繝ｩ繝逋ｺ蜍穂ｸｭ縺ｧ繧ゅせ繝壹す繝｣繝ｫ謾ｻ謦・ｼ育椪髢鍋ｧｻ蜍慕ｭ会ｼ峨・蜈･蜉帙ｒ險ｱ蜿ｯ縺吶ｋ縺九←縺・°
+        /// </summary>
+        public virtual bool CanInputSpecialDuringAttack => false;
 
         /// <summary>
         /// キャラクターの全体的（スペシャル等）なクールダウンの残り時間（秒）を取得します。

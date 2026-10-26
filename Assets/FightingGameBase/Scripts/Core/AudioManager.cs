@@ -1,12 +1,12 @@
+using System.Collections;
 using UnityEngine;
 
 namespace FightingGameBase
 {
-    // =================================================================================
-    // 【AudioManager】
-    // パリー成功音（SE_Parry: 鋼鉄の澄んだキィィィン！）およびガード音の自動再生・管理
-    // シーン開始時に自動初期化され、2Dオーディオでクリア＆大迫力に再生されます。
-    // =================================================================================
+    /// <summary>
+    /// ゲーム全体の効果音（SE）やパリー音、前兆音、テレポート音を管理するオーディオマネージャー。
+    /// 外部オーディオファイルに依存せず、動的に高品質なSEクリップを合成生成（プロシージャル生成）します。
+    /// </summary>
     public class AudioManager : MonoBehaviour
     {
         public static AudioManager Instance { get; private set; }
@@ -14,6 +14,8 @@ namespace FightingGameBase
         private AudioSource seSource;
         private static AudioClip parryClip;
         private static AudioClip blockClip;
+        private static AudioClip warningClip;
+        private static AudioClip teleportClip;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void AutoInitialize()
@@ -65,19 +67,14 @@ namespace FightingGameBase
                 }
                 seSource.playOnAwake = false;
                 seSource.loop = false;
-                seSource.spatialBlend = 0f; // 2Dサウンド（カメラ距離に減衰されず全開で響く）
+                seSource.spatialBlend = 0f; // 2Dサウンド
                 seSource.volume = 1.0f;
             }
 
-            if (parryClip == null)
-            {
-                parryClip = GenerateParryClip();
-            }
-
-            if (blockClip == null)
-            {
-                blockClip = GenerateBlockClip();
-            }
+            if (parryClip == null) parryClip = GenerateParryClip();
+            if (blockClip == null) blockClip = GenerateBlockClip();
+            if (warningClip == null) warningClip = GenerateWarningClip();
+            if (teleportClip == null) teleportClip = GenerateTeleportClip();
         }
 
         /// <summary>
@@ -88,10 +85,7 @@ namespace FightingGameBase
             EnsureInstance();
             if (Instance != null && Instance.seSource != null)
             {
-                if (parryClip == null)
-                {
-                    parryClip = GenerateParryClip();
-                }
+                if (parryClip == null) parryClip = GenerateParryClip();
                 Instance.seSource.PlayOneShot(parryClip, 1.0f);
                 Debug.Log("[AudioManager] ★ パリー成功音（キィィィン！）を再生しました ★");
             }
@@ -105,17 +99,39 @@ namespace FightingGameBase
             EnsureInstance();
             if (Instance != null && Instance.seSource != null)
             {
-                if (blockClip == null)
-                {
-                    blockClip = GenerateBlockClip();
-                }
+                if (blockClip == null) blockClip = GenerateBlockClip();
                 Instance.seSource.PlayOneShot(blockClip, 0.75f);
             }
         }
 
         /// <summary>
-        /// 関（SEKIRO）やDeepwoken、ストリートファイター3rdを彷彿とさせる、
-        /// 鋼鉄の刃が激突して美しい残響を放つ極上のパリー音「キィィィン！」を合成生成します。
+        /// パリー対応攻撃や大技の振り下ろし前兆を知らせる高周波の閃光・予兆音（ピキィィン！）を再生します。
+        /// </summary>
+        public static void PlayWarningSound()
+        {
+            EnsureInstance();
+            if (Instance != null && Instance.seSource != null)
+            {
+                if (warningClip == null) warningClip = GenerateWarningClip();
+                Instance.seSource.PlayOneShot(warningClip, 0.85f);
+            }
+        }
+
+        /// <summary>
+        /// 忍者の黄色い閃光や瞬間移動時に鳴る、電光ワープ音（シュンッ・バチィン！）を再生します。
+        /// </summary>
+        public static void PlayTeleportSound()
+        {
+            EnsureInstance();
+            if (Instance != null && Instance.seSource != null)
+            {
+                if (teleportClip == null) teleportClip = GenerateTeleportClip();
+                Instance.seSource.PlayOneShot(teleportClip, 0.90f);
+            }
+        }
+
+        /// <summary>
+        /// 関（SEKIRO）やDeepwoken、ストリートファイター3rdを彷彿とさせるパリー音「キィィィン！」
         /// </summary>
         public static AudioClip GenerateParryClip()
         {
@@ -130,57 +146,30 @@ namespace FightingGameBase
             for (int i = 0; i < sampleCount; i++)
             {
                 float t = (float)i / sampleRate;
-
-                // 1. 初動の衝撃衝突クラッシュ（0.00〜0.04秒の金属衝突ノイズ）
                 float noise = ((float)rand.NextDouble() * 2f - 1f) * Mathf.Exp(-t * 110f) * 0.40f;
-
-                // 2. 衝突瞬間の高周波ピッチスウィープ（金属の弾き）
                 float sweepFreq = 3800f * Mathf.Exp(-t * 70f) + 1860f;
                 phaseSweep += 2f * Mathf.PI * sweepFreq / sampleRate;
                 float sweepTone = Mathf.Sin(phaseSweep) * Mathf.Exp(-t * 28f) * 0.45f;
-
-                // 3. 刀身が美しく鳴り響く微妙なピッチビブラート（12Hz）
                 float vib = 1f + 0.0035f * Mathf.Sin(2f * Mathf.PI * 12f * t);
 
-                // 4. 金属刃物固有の非調和モード倍音群（澄んだ高音の金属音）
-                float m0 = Mathf.Sin(2f * Mathf.PI * 1860f * vib * t) * Mathf.Exp(-t * 6.2f) * 0.50f; // 基本澄音 (1860Hz)
-                float m1 = Mathf.Sin(2f * Mathf.PI * 2820f * vib * t) * Mathf.Exp(-t * 7.5f) * 0.38f; // 5度上共鳴 (2820Hz)
-                float m2 = Mathf.Sin(2f * Mathf.PI * 4480f * vib * t) * Mathf.Exp(-t * 12.0f) * 0.28f; // 金属ベル音 (4480Hz)
-                float m3 = Mathf.Sin(2f * Mathf.PI * 6250f * t) * Mathf.Exp(-t * 18.0f) * 0.20f; // 高域シャープネス
-                float m4 = Mathf.Sin(2f * Mathf.PI * 930f * t) * Mathf.Exp(-t * 9.0f) * 0.28f;  // 鍔鳴りの低域 (930Hz)
-                float m5 = Mathf.Sin(2f * Mathf.PI * 8200f * t) * Mathf.Exp(-t * 25.0f) * 0.15f; // きらめき成分
+                float m0 = Mathf.Sin(2f * Mathf.PI * 1860f * vib * t) * Mathf.Exp(-t * 6.2f) * 0.50f;
+                float m1 = Mathf.Sin(2f * Mathf.PI * 2820f * vib * t) * Mathf.Exp(-t * 7.5f) * 0.38f;
+                float m2 = Mathf.Sin(2f * Mathf.PI * 4480f * vib * t) * Mathf.Exp(-t * 12.0f) * 0.28f;
+                float m3 = Mathf.Sin(2f * Mathf.PI * 6250f * t) * Mathf.Exp(-t * 18.0f) * 0.20f;
+                float m4 = Mathf.Sin(2f * Mathf.PI * 930f * t) * Mathf.Exp(-t * 9.0f) * 0.28f;
+                float m5 = Mathf.Sin(2f * Mathf.PI * 8200f * t) * Mathf.Exp(-t * 25.0f) * 0.15f;
 
                 float sample = noise + sweepTone + m0 + m1 + m2 + m3 + m4 + m5;
-
-                // 5. アタック立ち上がり（クリックノイズ防止）
                 float attack = Mathf.Clamp01(t / 0.0012f);
                 samples[i] = sample * attack;
             }
 
-            // ピークノーマライズ（歪まない最大音量 0.95 に調整）
-            float max = 0f;
-            for (int i = 0; i < sampleCount; i++)
-            {
-                float abs = Mathf.Abs(samples[i]);
-                if (abs > max) max = abs;
-            }
-            if (max > 0.001f)
-            {
-                float gain = 0.95f / max;
-                for (int i = 0; i < sampleCount; i++)
-                {
-                    samples[i] *= gain;
-                }
-            }
-
+            Normalize(samples, 0.95f);
             AudioClip clip = AudioClip.Create("SE_Parry", sampleCount, 1, sampleRate, false);
             clip.SetData(samples, 0);
             return clip;
         }
 
-        /// <summary>
-        /// 通常ガード成功時の重厚な打撃受止め音「ガッ！」を合成生成します。
-        /// </summary>
         public static AudioClip GenerateBlockClip()
         {
             int sampleRate = 44100;
@@ -196,28 +185,91 @@ namespace FightingGameBase
                 float low = Mathf.Sin(2f * Mathf.PI * 260f * t) * Mathf.Exp(-t * 22f) * 0.5f;
                 float mid = Mathf.Sin(2f * Mathf.PI * 580f * t) * Mathf.Exp(-t * 30f) * 0.35f;
 
-                float sample = (noise + low + mid) * Mathf.Clamp01(t / 0.001f);
-                samples[i] = sample;
+                samples[i] = (noise + low + mid) * Mathf.Clamp01(t / 0.001f);
             }
 
-            float max = 0f;
+            Normalize(samples, 0.90f);
+            AudioClip clip = AudioClip.Create("SE_Block", sampleCount, 1, sampleRate, false);
+            clip.SetData(samples, 0);
+            return clip;
+        }
+
+        public static AudioClip GenerateWarningClip()
+        {
+            int sampleRate = 44100;
+            float duration = 0.28f;
+            int sampleCount = Mathf.FloorToInt(sampleRate * duration);
+            float[] samples = new float[sampleCount];
+
+            float phase = 0f;
             for (int i = 0; i < sampleCount; i++)
+            {
+                float t = (float)i / sampleRate;
+                float freq = Mathf.Lerp(2200f, 3900f, Mathf.Sqrt(t / duration));
+                phase += 2f * Mathf.PI * freq / sampleRate;
+
+                float tone1 = Mathf.Sin(phase) * Mathf.Exp(-t * 14f) * 0.45f;
+                float tone2 = Mathf.Sin(phase * 1.5f) * Mathf.Exp(-t * 18f) * 0.25f;
+                float tone3 = Mathf.Sin(phase * 2.0f) * Mathf.Exp(-t * 24f) * 0.15f;
+
+                samples[i] = (tone1 + tone2 + tone3) * Mathf.Clamp01(t / 0.002f);
+            }
+
+            Normalize(samples, 0.85f);
+            AudioClip clip = AudioClip.Create("SE_WarningTell", sampleCount, 1, sampleRate, false);
+            clip.SetData(samples, 0);
+            return clip;
+        }
+
+        /// <summary>
+        /// 黄色い閃光・瞬間移動の電光風ワープ音（シュンッ！）
+        /// </summary>
+        public static AudioClip GenerateTeleportClip()
+        {
+            int sampleRate = 44100;
+            float duration = 0.22f;
+            int sampleCount = Mathf.FloorToInt(sampleRate * duration);
+            float[] samples = new float[sampleCount];
+
+            float phase = 0f;
+            System.Random rand = new System.Random(888);
+
+            for (int i = 0; i < sampleCount; i++)
+            {
+                float t = (float)i / sampleRate;
+                // 急速ピッチダウンの電光スウィープ（3600Hz -> 650Hz）
+                float sweepFreq = 3600f * Mathf.Exp(-t * 22f) + 650f;
+                phase += 2f * Mathf.PI * sweepFreq / sampleRate;
+
+                float tone = Mathf.Sin(phase) * Mathf.Exp(-t * 16f) * 0.55f;
+                float zapNoise = ((float)rand.NextDouble() * 2f - 1f) * Mathf.Exp(-t * 40f) * 0.35f;
+                float sub = Mathf.Sin(phase * 0.5f) * Mathf.Exp(-t * 12f) * 0.30f;
+
+                samples[i] = (tone + zapNoise + sub) * Mathf.Clamp01(t / 0.001f);
+            }
+
+            Normalize(samples, 0.90f);
+            AudioClip clip = AudioClip.Create("SE_Teleport", sampleCount, 1, sampleRate, false);
+            clip.SetData(samples, 0);
+            return clip;
+        }
+
+        private static void Normalize(float[] samples, float targetMax)
+        {
+            float max = 0f;
+            for (int i = 0; i < samples.Length; i++)
             {
                 float abs = Mathf.Abs(samples[i]);
                 if (abs > max) max = abs;
             }
             if (max > 0.001f)
             {
-                float gain = 0.90f / max;
-                for (int i = 0; i < sampleCount; i++)
+                float gain = targetMax / max;
+                for (int i = 0; i < samples.Length; i++)
                 {
                     samples[i] *= gain;
                 }
             }
-
-            AudioClip clip = AudioClip.Create("SE_Block", sampleCount, 1, sampleRate, false);
-            clip.SetData(samples, 0);
-            return clip;
         }
     }
 }

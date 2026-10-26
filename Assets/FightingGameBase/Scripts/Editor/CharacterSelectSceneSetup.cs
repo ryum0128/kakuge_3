@@ -56,6 +56,7 @@ namespace FightingGameBase.Editor
                 MakeEntry("Thunder", "Assets/Thunder/ThunderCharacter.prefab"),
                 MakeEntry("Ice", "Assets/Ice/IceCharacter.prefab"),
                 MakeEntry("Shadow", "Assets/Shadow/ShadowCharacter.prefab"),
+                MakeEntry("Ninja", "Assets/Ninja/NinjaCharacter.prefab"),
             };
 
             EditorSceneManager.MarkSceneDirty(scene);

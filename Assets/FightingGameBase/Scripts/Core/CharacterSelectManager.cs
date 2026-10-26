@@ -134,6 +134,7 @@ namespace FightingGameBase
                     MakeEntry("Thunder", "Assets/Thunder/ThunderCharacter.prefab"),
                     MakeEntry("Ice", "Assets/Ice/IceCharacter.prefab"),
                     MakeEntry("Shadow", "Assets/Shadow/ShadowCharacter.prefab"),
+                    MakeEntry("Ninja", "Assets/Ninja/NinjaCharacter.prefab"),
                 };
             }
             else
@@ -159,6 +160,11 @@ namespace FightingGameBase
                 if (!hasShadow)
                 {
                     list.Add(MakeEntry("Shadow", "Assets/Shadow/ShadowCharacter.prefab"));
+                }
+                bool hasNinja = list.Exists(w => w != null && w.displayName == "Ninja");
+                if (!hasNinja)
+                {
+                    list.Add(MakeEntry("Ninja", "Assets/Ninja/NinjaCharacter.prefab"));
                     modified = true;
                 }
 
@@ -256,7 +262,7 @@ namespace FightingGameBase
             }
 
             // ルートオブジェクトからもキャラクター関連プレハブを検出して確実に消去
-            string[] keywords = { "Flame", "TAIKEN", "Dagger", "Hammer", "Whip", "Lightsaber", "Gannrannsu", "Template", "Thunder" };
+            string[] keywords = { "Flame", "TAIKEN", "Dagger", "Thunder", "Ice", "Shadow", "Ninja", "Template" };
             GameObject[] roots = UnityEngine.SceneManagement.SceneManager.GetActiveScene().GetRootGameObjects();
             foreach (var r in roots)
             {

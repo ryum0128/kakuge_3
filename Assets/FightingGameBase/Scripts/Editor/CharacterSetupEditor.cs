@@ -44,14 +44,6 @@ namespace FightingGameBase.Editor
             {
                 CreateTemplateCharacterInternal();
             }
-
-            // ライトセーバーキャラクターの自動生成（存在しない場合のみ）
-            string lightsaberFolderPath = "Assets/ライトセーバー";
-            string lightsaberPrefabPath = lightsaberFolderPath + "/LightsaberCharacter.prefab";
-            if (!System.IO.File.Exists(lightsaberPrefabPath))
-            {
-                CreateLightsaberCharacterInternal();
-            }
         }
 
         // Unityのメニューバーから手動作成する用のメニュー項目
@@ -61,11 +53,6 @@ namespace FightingGameBase.Editor
             CreateTemplateCharacterInternal();
         }
 
-        [MenuItem("FightingGame/ライトセーバーキャラクターを作成する")]
-        public static void CreateLightsaberCharacter()
-        {
-            CreateLightsaberCharacterInternal();
-        }
 
         [MenuItem("FightingGame/地面を作成する")]
         public static void CreateGround()
@@ -135,7 +122,7 @@ namespace FightingGameBase.Editor
             
             SpriteRenderer sr = visuals.AddComponent<SpriteRenderer>(); // 2D画像を表示するためのコンポーネント
             
-            string spritePath = "Assets/ライトセーバー/LightsaberCharacterSprite.png";
+            string spritePath = null;
             EnsureFullRectSprite(spritePath);
             Sprite customSprite = null;
             if (System.IO.File.Exists(spritePath))
@@ -205,143 +192,6 @@ namespace FightingGameBase.Editor
             Selection.activeGameObject = root;
             
             Debug.Log($"【完了】お手本キャラクターを全部込々にしてプレハブとして作成しました！\n場所: {prefabPath} に保存されています。");
-        }
-
-        public static void CreateLightsaberCharacterInternal()
-        {
-            // 1. ルート（一番親）となるオブジェクトの作成
-            GameObject root = new GameObject("LightsaberCharacter");
-            
-            // 物理エンジンの設定（格ゲーっぽく重力を強めに、回転しないように設定）
-            Rigidbody2D rb = root.AddComponent<Rigidbody2D>();
-            rb.gravityScale = 3f; 
-            rb.constraints = RigidbodyConstraints2D.FreezeRotation;
-            rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
-
-            // 食らい判定用のコライダー（縦長のピル型）
-            CapsuleCollider2D hurtCollider = root.AddComponent<CapsuleCollider2D>();
-            hurtCollider.size = new Vector2(1f, 2f);
-
-            // 用意したスクリプトをアタッチ
-            LightsaberCharacter characterBase = root.AddComponent<LightsaberCharacter>();
-            Hurtbox hurtbox = root.AddComponent<Hurtbox>();
-            hurtbox.owner = characterBase;
-            
-            // 入力コントローラーもアタッチ
-            PlayerInputController inputController = root.AddComponent<PlayerInputController>();
-
-            // 2. 見た目（グラフィック）とアニメーション用の階層
-            GameObject visuals = new GameObject("Visuals");
-            visuals.transform.SetParent(root.transform);
-            visuals.transform.localPosition = Vector3.zero;
-            visuals.transform.localScale = new Vector3(0.35f, 0.35f, 1f); // サイズをさらに小さく設定（0.6 -> 0.35）
-            
-            SpriteRenderer sr = visuals.AddComponent<SpriteRenderer>(); // 2D画像を表示するためのコンポーネント
-            
-            string spritePath = "Assets/ライトセーバー/LightsaberCharacterSprite.png";
-            EnsureFullRectSprite(spritePath);
-            Sprite customSprite = null;
-            if (System.IO.File.Exists(spritePath))
-            {
-                customSprite = AssetDatabase.LoadAssetAtPath<Sprite>(spritePath);
-            }
-
-            if (customSprite != null)
-            {
-                sr.sprite = customSprite;
-                // 当たり判定とキャラ画像の大きさを同じにする（スケール0.35を考慮）
-                hurtCollider.size = new Vector2(customSprite.bounds.size.x * 0.35f, customSprite.bounds.size.y * 0.35f);
-            }
-            else
-            {
-                // 見やすいように仮の画像（四角形）をセットし、当たり判定（1x2）と同じサイズにする
-                sr.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
-                sr.drawMode = SpriteDrawMode.Simple;
-                visuals.transform.localScale = new Vector3(0.35f, 0.7f, 1f);
-                hurtCollider.size = new Vector2(1f, 2f);
-            }
-            
-            visuals.AddComponent<FloatingBehavior>(); // ふわふわと浮遊する挙動を追加！
-
-            // 3. 攻撃判定（Hitbox）の階層 (リーチは普通、攻撃の発生も早い)
-            GameObject hitboxObj = new GameObject("LightsaberHitbox");
-            hitboxObj.transform.SetParent(root.transform);
-            // ライトセーバーの刀身全体（根本から剣先まで）をカバーするように配置
-            hitboxObj.transform.localPosition = new Vector3(1.4f, 0.5f, 0f); 
-            
-            // 攻撃判定用のコライダー（トリガーにするのがポイント！）
-            BoxCollider2D hitCollider = hitboxObj.AddComponent<BoxCollider2D>();
-            hitCollider.isTrigger = true;
-            // 横に長くして刀身全体を包み込む
-            hitCollider.size = new Vector2(2.6f, 0.8f);
-
-            // 用意したHitboxスクリプトをアタッチ
-            Hitbox hitbox = hitboxObj.AddComponent<Hitbox>();
-            hitbox.damage = 15; // ライトセーバーの威力は少し高めに設定（テンプレートは10）
-            hitbox.ownerPlayerID = 1;
-
-            // 最初は攻撃していないので、非アクティブ（オフ）にしておく
-            hitboxObj.SetActive(false);
-            
-            // 3.5. カウンター攻撃専用の判定（Hitbox）の階層
-            GameObject counterHitboxObj = new GameObject("CounterHitbox");
-            counterHitboxObj.transform.SetParent(root.transform);
-            // カウンターは強力なのでさらに広く、少し高めに配置
-            counterHitboxObj.transform.localPosition = new Vector3(1.5f, 0.5f, 0f); 
-            
-            BoxCollider2D counterHitCollider = counterHitboxObj.AddComponent<BoxCollider2D>();
-            counterHitCollider.isTrigger = true;
-            counterHitCollider.size = new Vector2(2.5f, 1.5f); // 広範囲！
-
-            Hitbox counterHitbox = counterHitboxObj.AddComponent<Hitbox>();
-            counterHitbox.damage = 30; // カウンターは高火力
-            counterHitbox.ownerPlayerID = 1;
-            counterHitboxObj.SetActive(false);
-            
-            // スクリプトに紐付け
-            characterBase.counterHitbox = counterHitbox;
-
-            // 4. ステータス（CharacterStats）の自動作成とセット
-            string folderPath = "Assets/ライトセーバー";
-            if (!System.IO.Directory.Exists(folderPath))
-            {
-                System.IO.Directory.CreateDirectory(folderPath);
-            }
-
-            string statsPath = folderPath + "/LightsaberCharacterStats.asset";
-            CharacterStats stats = AssetDatabase.LoadAssetAtPath<CharacterStats>(statsPath);
-            if (stats == null)
-            {
-                stats = ScriptableObject.CreateInstance<CharacterStats>();
-                // ライトセーバーを扱う敏捷なキャラ用のパラメータ設定
-                stats.maxHP = 120;
-                stats.moveSpeed = 6.5f; // 素早く動けるようにスピードをアップ
-                stats.jumpForce = 13.5f; // ジャンプも高く
-                AssetDatabase.CreateAsset(stats, statsPath);
-                AssetDatabase.SaveAssets();
-            }
-            characterBase.stats = stats;
-
-            // カウンターモーション用スプライトを自動アサイン
-            void AssignSprite(string path, System.Action<Sprite> assign)
-            {
-                EnsureFullRectSprite(path);
-                Sprite s = AssetDatabase.LoadAssetAtPath<Sprite>(path);
-                if (s != null) assign(s);
-            }
-            AssignSprite("Assets/ライトセーバー/LightsaberCharacterSprite.png",  s => characterBase.spriteNormal       = s);
-            AssignSprite("Assets/ライトセーバー/LightsaberSprite_CounterStance.png",  s => characterBase.spriteCounterStance  = s);
-            AssignSprite("Assets/ライトセーバー/LightsaberSprite_CounterFlash.png",   s => characterBase.spriteCounterFlash   = s);
-            AssignSprite("Assets/ライトセーバー/LightsaberSprite_CounterAttack.png",  s => characterBase.spriteCounterAttack  = s);
-
-            // 5. 自動でプレハブ化して保存する
-            string prefabPath = folderPath + "/LightsaberCharacter.prefab";
-            PrefabUtility.SaveAsPrefabAssetAndConnect(root, prefabPath, InteractionMode.UserAction);
-
-            // 作成したオブジェクトを選択状態にする
-            Selection.activeGameObject = root;
-            
-            Debug.Log($"【完了】ライトセーバーキャラクターをプレハブとして作成しました！\n場所: {prefabPath} に保存されています。");
         }
 
         private static void EnsureFullRectSprite(string path)

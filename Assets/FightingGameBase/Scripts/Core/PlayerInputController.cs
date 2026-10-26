@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace FightingGameBase
@@ -222,7 +222,7 @@ namespace FightingGameBase
 
             // 移動の処理と、攻撃の処理をそれぞれ呼び出します
             HandleMovement();
-            if (character.IsAttacking) return;
+            if (character.IsAttacking && !character.CanInputSpecialDuringAttack) return;
             HandleAttacks();
             HandleBlock();
         }
