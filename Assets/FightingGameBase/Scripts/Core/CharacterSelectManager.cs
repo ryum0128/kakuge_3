@@ -400,34 +400,7 @@ namespace FightingGameBase
                 pic.SetupKeys(playerID);
             }
 
-            // GannrannsuInputController
-            var gic = go.GetComponent<GannrannsuInputController>();
-            if (gic != null)
-            {
-                gic.SetupKeys(playerID);
-            }
-
-            // HammerInputController
-            var hic = go.GetComponent<HammerInputController>();
-            if (hic != null)
-            {
-                if (playerID == 1)
-                {
-                    hic.leftKey = Key.A;
-                    hic.rightKey = Key.D;
-                    hic.jumpKey = Key.W;
-                    hic.normalAttackKey = Key.K;
-                    hic.specialAttackKey = Key.L;
-                }
-                else
-                {
-                    hic.leftKey = Key.LeftArrow;
-                    hic.rightKey = Key.RightArrow;
-                    hic.jumpKey = Key.UpArrow;
-                    hic.normalAttackKey = Key.I;
-                    hic.specialAttackKey = Key.O;
-                }
-            }
+            // その他のコントローラーがあれば必要に応じて設定可能
         }
 
         private static void FaceDirection(Transform t, float sign)

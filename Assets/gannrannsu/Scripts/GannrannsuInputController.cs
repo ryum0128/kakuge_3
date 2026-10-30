@@ -1,13 +1,19 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace FightingGameBase
 {
     // =================================================================================
-    // 【GannrannsuInputController（ガンランス専用入力コントローラー）】
-    // 格闘ゲーム共通の標準入力（J=通常攻撃, K=特殊攻撃, Space=ジャンプ, H=ガード, L=ダッシュ）
-    // に完全対応しつつ、旧キー（W=ジャンプ, K=通常攻撃, L=特殊攻撃）の入力も受け付ける
-    // デュアル対応コントローラーです。Xboxコントローラー入力にも完全対応しています。
+    // 【GannrannsuInputController（ガンランス専用の入力コントローラー）】
+    // お手本の PlayerInputController をベースに、ガンランスキャラクター用に作りました。
+    //
+    // 【なぜ専用コントローラーが必要なの？】
+    //   お手本の PlayerInputController は CharacterBase 型でメソッドを呼びます。
+    //   しかしガンランスの攻撃メソッド（砲撃や竜撃砲）は「new」キーワードで
+    //   独自に定義しているため、CharacterBase 型から呼ぶとお手本の攻撃が出てしまいます。
+    //   GannrannsuCharacter 型で直接呼ぶことで、ガンランス固有の攻撃が正しく発動します！
+    //
+    //   移動とジャンプは CharacterBase から継承しているのでそのまま使えます。
     // =================================================================================
     [RequireComponent(typeof(GannrannsuCharacter))]
     public class GannrannsuInputController : MonoBehaviour
@@ -15,259 +21,76 @@ namespace FightingGameBase
         [Header("キー設定 (インスペクターで自由に変更可能)")]
         public Key leftKey = Key.A;              // 左移動
         public Key rightKey = Key.D;             // 右移動
-        public Key jumpKey = Key.Space;          // ジャンプ（Space / W 両対応）
-        public Key normalAttackKey = Key.J;      // 通常攻撃（J / K 両対応）
-        public Key specialAttackKey = Key.K;     // 特殊攻撃（K / L 両対応）
-        public Key blockKey = Key.H;             // ブロック・パリィ
-        public Key dashKey = Key.L;              // ダッシュ・回避
-        public Key stunAttackKey = Key.C;        // スタン攻撃
+        public Key jumpKey = Key.W;              // ジャンプ
+        public Key normalAttackKey = Key.K;      // 通常攻撃（ランスの突き）
+        public Key specialAttackKey = Key.L;     // 特殊攻撃（砲撃弾）
 
-        [Header("同時押し判定猶予（秒）")]
-        [Tooltip("通常＋特殊攻撃の同時押しと判定する猶予時間。0.05秒が標準")]
+        [Header("設定")]
+        [Tooltip("ZとXの同時押しと判定する猶予時間（秒）。0.05秒くらいがちょうどいいです")]
         public float simultaneousPressWindow = 0.05f;
 
+        // ★ポイント：CharacterBase ではなく GannrannsuCharacter 型で持つ！
+        //   こうすることで、ガンランス固有のメソッドが正しく呼ばれます。
         private GannrannsuCharacter character;
 
         // --- 入力タイミングの記録用 ---
-        private float lastNormalAttackPressTime = -1f;
-        private float lastSpecialAttackPressTime = -1f;
+        private float lastZPressTime = -1f;
+        private float lastXPressTime = -1f;
         private bool isUltimateTriggered = false;
+        // private float chargeTimer = 0f;
 
         private bool keysInitialized = false;
 
-        void Awake()
-        {
-            character = GetComponent<GannrannsuCharacter>();
-        }
-
         void Start()
         {
-            if (character == null)
-            {
-                character = GetComponent<GannrannsuCharacter>();
-            }
-            if (!keysInitialized)
-            {
-                InitializeKeysByContext();
-            }
+            // GannrannsuCharacter 繧貞叙蠕励＠縺ｾ縺・            character = GetComponent<GannrannsuCharacter>();
         }
 
-        public void SetupKeys(int targetPlayerID)
+        private void InitializeKeys()
         {
-            if (character == null) character = GetComponent<GannrannsuCharacter>();
-            if (character != null) character.playerID = targetPlayerID;
-
-            if (targetPlayerID == 1)
-            {
-                leftKey = Key.A;
-                rightKey = Key.D;
-                jumpKey = Key.Space;
-                normalAttackKey = Key.J;
-                specialAttackKey = Key.K;
-                blockKey = Key.H;
-                dashKey = Key.L;
-                stunAttackKey = Key.C;
-            }
-            else
+            if (character != null && (character.playerID == 2 || name.Contains("P2") || name.Contains("RightSide") || name.Contains("Player2")))
             {
                 leftKey = Key.LeftArrow;
                 rightKey = Key.RightArrow;
                 jumpKey = Key.UpArrow;
-                normalAttackKey = Key.Numpad1;
-                specialAttackKey = Key.Numpad2;
-                blockKey = Key.Numpad3;
-                dashKey = Key.Numpad5;
-                stunAttackKey = Key.Numpad0;
+                normalAttackKey = Key.I;
+                specialAttackKey = Key.O;
             }
             keysInitialized = true;
-        }
-
-        private void InitializeKeysByContext()
-        {
-            if (character == null) character = GetComponent<GannrannsuCharacter>();
-
-            if (character != null && (character.playerID == 2 || name.Contains("P2") || name.Contains("RightSide") || name.Contains("Player2")))
-            {
-                SetupKeys(2);
-            }
-            else
-            {
-                SetupKeys(1);
-            }
         }
 
         void Update()
         {
             if (!keysInitialized)
             {
-                InitializeKeysByContext();
+                InitializeKeys();
             }
 
-            // キャラクターが存在しない、死亡中、スタン中、被弾ロック中は入力を受け付けない
-            if (character == null || character.isDead || character.isStunned || character.IsHurtLocked) return;
-
-            // キーボードもゲームパッドも接続されていない場合は何もしない
+            if (character == null || character.isDead) return;
+            // キーボードもゲームパッドも接続されていない場合は何もしません
             if (Keyboard.current == null && Gamepad.all.Count == 0) return;
 
             HandleMovement();
-
-            // 攻撃硬直中は次の攻撃入力を開始しない
-            if (character.IsAttacking) return;
-
             HandleAttacks();
-            HandleBlock();
         }
 
         // ==========================================
-        // 入力判定ヘルパー（キーボード + ゲームパッド + 旧キー互換）
+        // Xboxコントローラー対応
+        // playerID 1 → 1台目のコントローラー、playerID 2 → 2台目のコントローラーを使います
         // ==========================================
         private int PlayerID => character != null ? character.playerID : 1;
 
-        private bool IsLeftPressed()
-        {
-            if (Keyboard.current != null)
-            {
-                if (Keyboard.current[leftKey].isPressed) return true;
-            }
-            return GamepadInputHelper.GetMoveDirection(PlayerID) < 0f;
-        }
-
-        private bool IsRightPressed()
-        {
-            if (Keyboard.current != null)
-            {
-                if (Keyboard.current[rightKey].isPressed) return true;
-            }
-            return GamepadInputHelper.GetMoveDirection(PlayerID) > 0f;
-        }
-
-        private bool WasJumpPressed()
-        {
-            if (Keyboard.current != null)
-            {
-                if (Keyboard.current[jumpKey].wasPressedThisFrame) return true;
-                // 1P: Space でも W でもジャンプ可能
-                if (PlayerID == 1 && Keyboard.current[Key.W].wasPressedThisFrame) return true;
-            }
-            return GamepadInputHelper.WasPressedThisFrame(PlayerID, GamepadInputHelper.GamepadAction.Jump);
-        }
-
-        private bool WasNormalAttackPressed()
-        {
-            if (Keyboard.current != null)
-            {
-                if (Keyboard.current[normalAttackKey].wasPressedThisFrame) return true;
-
-                if (PlayerID == 1)
-                {
-                    // 1P: J でも K でも通常突き可能
-                    if (Keyboard.current[Key.J].wasPressedThisFrame || Keyboard.current[Key.K].wasPressedThisFrame) return true;
-                }
-                else
-                {
-                    // 2P: Numpad1 / U / I で通常攻撃可能
-                    if (Keyboard.current[Key.U].wasPressedThisFrame || Keyboard.current[Key.I].wasPressedThisFrame) return true;
-                }
-            }
-            return GamepadInputHelper.WasPressedThisFrame(PlayerID, GamepadInputHelper.GamepadAction.NormalAttack);
-        }
-
-        private bool WasNormalAttackReleased()
-        {
-            if (Keyboard.current != null)
-            {
-                if (Keyboard.current[normalAttackKey].wasReleasedThisFrame) return true;
-                if (PlayerID == 1)
-                {
-                    if (Keyboard.current[Key.J].wasReleasedThisFrame || Keyboard.current[Key.K].wasReleasedThisFrame) return true;
-                }
-                else
-                {
-                    if (Keyboard.current[Key.U].wasReleasedThisFrame || Keyboard.current[Key.I].wasReleasedThisFrame) return true;
-                }
-            }
-            return GamepadInputHelper.WasReleasedThisFrame(PlayerID, GamepadInputHelper.GamepadAction.NormalAttack);
-        }
-
-        private bool WasSpecialAttackPressed()
-        {
-            if (Keyboard.current != null)
-            {
-                if (Keyboard.current[specialAttackKey].wasPressedThisFrame) return true;
-
-                if (PlayerID == 1)
-                {
-                    // 1P: K または L でも特殊砲撃可能
-                    if (Keyboard.current[Key.K].wasPressedThisFrame || Keyboard.current[Key.L].wasPressedThisFrame) return true;
-                }
-                else
-                {
-                    // 2P: Numpad2 / I / O で特殊攻撃可能
-                    if (Keyboard.current[Key.I].wasPressedThisFrame || Keyboard.current[Key.O].wasPressedThisFrame) return true;
-                }
-            }
-            return GamepadInputHelper.WasPressedThisFrame(PlayerID, GamepadInputHelper.GamepadAction.SpecialAttack);
-        }
-
-        private bool WasSpecialAttackReleased()
-        {
-            if (Keyboard.current != null)
-            {
-                if (Keyboard.current[specialAttackKey].wasReleasedThisFrame) return true;
-                if (PlayerID == 1)
-                {
-                    if (Keyboard.current[Key.K].wasReleasedThisFrame || Keyboard.current[Key.L].wasReleasedThisFrame) return true;
-                }
-                else
-                {
-                    if (Keyboard.current[Key.I].wasReleasedThisFrame || Keyboard.current[Key.O].wasReleasedThisFrame) return true;
-                }
-            }
-            return GamepadInputHelper.WasReleasedThisFrame(PlayerID, GamepadInputHelper.GamepadAction.SpecialAttack);
-        }
-
-        private bool WasBlockPressed()
-        {
-            if (Keyboard.current != null)
-            {
-                if (Keyboard.current[blockKey].wasPressedThisFrame) return true;
-                if (PlayerID == 2 && Keyboard.current[Key.O].wasPressedThisFrame) return true;
-            }
-            return GamepadInputHelper.WasPressedThisFrame(PlayerID, GamepadInputHelper.GamepadAction.Block);
-        }
-
-        private bool WasBlockReleased()
-        {
-            if (Keyboard.current != null)
-            {
-                if (Keyboard.current[blockKey].wasReleasedThisFrame) return true;
-                if (PlayerID == 2 && Keyboard.current[Key.O].wasReleasedThisFrame) return true;
-            }
-            return GamepadInputHelper.WasReleasedThisFrame(PlayerID, GamepadInputHelper.GamepadAction.Block);
-        }
-
-        private bool WasDashPressed()
-        {
-            if (Keyboard.current != null)
-            {
-                if (Keyboard.current[dashKey].wasPressedThisFrame) return true;
-                if (PlayerID == 2 && Keyboard.current[Key.P].wasPressedThisFrame) return true;
-            }
-            return GamepadInputHelper.WasPressedThisFrame(PlayerID, GamepadInputHelper.GamepadAction.Dash);
-        }
-
-        private bool WasStunPressed()
-        {
-            if (Keyboard.current != null)
-            {
-                if (Keyboard.current[stunAttackKey].wasPressedThisFrame) return true;
-                if (PlayerID == 2 && Keyboard.current[Key.Y].wasPressedThisFrame) return true;
-            }
-            return GamepadInputHelper.WasPressedThisFrame(PlayerID, GamepadInputHelper.GamepadAction.StunAttack);
-        }
+        private bool IsLeftPressed() => (Keyboard.current != null && Keyboard.current[leftKey].isPressed) || GamepadInputHelper.GetMoveDirection(PlayerID) < 0f;
+        private bool IsRightPressed() => (Keyboard.current != null && Keyboard.current[rightKey].isPressed) || GamepadInputHelper.GetMoveDirection(PlayerID) > 0f;
+        private bool WasJumpPressedThisFrame() => (Keyboard.current != null && Keyboard.current[jumpKey].wasPressedThisFrame) || GamepadInputHelper.WasPressedThisFrame(PlayerID, GamepadInputHelper.GamepadAction.Jump);
+        private bool WasNormalAttackPressedThisFrame() => (Keyboard.current != null && Keyboard.current[normalAttackKey].wasPressedThisFrame) || GamepadInputHelper.WasPressedThisFrame(PlayerID, GamepadInputHelper.GamepadAction.NormalAttack);
+        private bool WasNormalAttackReleasedThisFrame() => (Keyboard.current != null && Keyboard.current[normalAttackKey].wasReleasedThisFrame) || GamepadInputHelper.WasReleasedThisFrame(PlayerID, GamepadInputHelper.GamepadAction.NormalAttack);
+        private bool WasSpecialAttackPressedThisFrame() => (Keyboard.current != null && Keyboard.current[specialAttackKey].wasPressedThisFrame) || GamepadInputHelper.WasPressedThisFrame(PlayerID, GamepadInputHelper.GamepadAction.SpecialAttack);
+        private bool WasSpecialAttackReleasedThisFrame() => (Keyboard.current != null && Keyboard.current[specialAttackKey].wasReleasedThisFrame) || GamepadInputHelper.WasReleasedThisFrame(PlayerID, GamepadInputHelper.GamepadAction.SpecialAttack);
 
         // ==========================================
-        // 移動とジャンプ、ダッシュの処理
+        // 移動とジャンプの処理
+        // （お手本とまったく同じ！CharacterBase の Move/Jump がそのまま使えます）
         // ==========================================
         private void HandleMovement()
         {
@@ -276,107 +99,87 @@ namespace FightingGameBase
             if (IsLeftPressed()) direction -= 1f;
             if (IsRightPressed()) direction += 1f;
 
+            // Move() は GannrannsuCharacter に new で定義されたものが呼ばれます（チャージ中は移動停止）
             character.Move(direction);
 
-            if (character.IsAttacking) return;
-
-            // ダッシュ／回避
-            if (WasDashPressed())
+            if (WasJumpPressedThisFrame())
             {
-                character.TriggerDashOrEvade(direction);
-            }
-
-            // ジャンプ
-            if (WasJumpPressed())
-            {
+                // Jump() も GannrannsuCharacter に new で定義されたものが呼ばれます
                 character.Jump();
             }
         }
 
         // ==========================================
-        // 攻撃と竜撃砲（必殺技）の処理
+        // 攻撃と「同時長押しチャージ」の処理
         // ==========================================
         private void HandleAttacks()
         {
-            bool normalDown = WasNormalAttackPressed();
-            bool specialDown = WasSpecialAttackPressed();
+            // キーが「押された瞬間」かどうかをチェックします
+            bool zDown = WasNormalAttackPressedThisFrame();
+            bool xDown = WasSpecialAttackPressedThisFrame();
 
-            if (normalDown) lastNormalAttackPressTime = Time.time;
-            if (specialDown) lastSpecialAttackPressTime = Time.time;
+            // 押されたら、その時のゲーム内時間を記録しておきます
+            if (zDown) lastZPressTime = Time.time;
+            if (xDown) lastXPressTime = Time.time;
 
-            // --- 同時押し（必殺技：竜撃砲）の判定 ---
+            // --- 同時押しの判定 ---
             bool isSimultaneous = false;
-            if (lastNormalAttackPressTime > 0 && lastSpecialAttackPressTime > 0 &&
-                Time.time - lastNormalAttackPressTime <= simultaneousPressWindow &&
-                Time.time - lastSpecialAttackPressTime <= simultaneousPressWindow)
+            // ZキーとXキーの両方が、最近（0.05秒以内）押されたかをチェックします
+            if (lastZPressTime > 0 && lastXPressTime > 0 &&
+                Time.time - lastZPressTime <= simultaneousPressWindow &&
+                Time.time - lastXPressTime <= simultaneousPressWindow)
             {
-                isSimultaneous = true;
+                isSimultaneous = true; // 同時押し成功！
             }
 
             if (isSimultaneous)
             {
+                // 同時押し（必殺技）
                 if (!isUltimateTriggered)
                 {
                     if (character.chargeGauge >= character.maxChargeGauge && character.ultimateAttackCooldownTimer <= 0f)
                     {
-                        character.AttackUltimate();
-                        isUltimateTriggered = true;
-                        lastNormalAttackPressTime = -1f;
-                        lastSpecialAttackPressTime = -1f;
+                        character.AttackUltimate(); // ゲージ満タンかつクールタイム中ではないなら即座に竜撃砲発射！
+                        isUltimateTriggered = true; // ボタン押しっぱなしによる連続発射を防ぐ
+                        
+                        // 同時押しが成功したため、単発攻撃（突き・砲撃）の予約をクリアします
+                        lastZPressTime = -1f;
+                        lastXPressTime = -1f;
                     }
                     else
                     {
-                        // ゲージ不足またはクールダウン中は通常突き
-                        character.AttackNormal();
-                        isUltimateTriggered = true;
-                        lastNormalAttackPressTime = -1f;
-                        lastSpecialAttackPressTime = -1f;
+                        Debug.Log("竜撃砲：チャージ不足またはクールタイム中！代わりに通常攻撃を発動します。");
+                        character.AttackNormal(); // 発動できない場合は通常攻撃（ランスの突き）を発動
+                        isUltimateTriggered = true; // ボタン押しっぱなしによる連続発射を防ぐ
+                        
+                        // 通常攻撃を発動したため、単発攻撃（突き・砲撃）の予約をクリアします
+                        lastZPressTime = -1f;
+                        lastXPressTime = -1f;
                     }
                 }
             }
             else
             {
-                // 単発通常攻撃（猶予時間を過ぎたら確定発動）
-                if (lastNormalAttackPressTime > 0 && Time.time - lastNormalAttackPressTime > simultaneousPressWindow)
+                // --- 単発入力の処理（同時押し猶予時間が経過した場合） ---
+                // 通常攻撃 (Z) → ランスの突き
+                if (lastZPressTime > 0 && Time.time - lastZPressTime > simultaneousPressWindow)
                 {
                     character.AttackNormal();
-                    lastNormalAttackPressTime = -1f;
-                    isUltimateTriggered = false;
+                    lastZPressTime = -1f;
                 }
 
-                // 単発特殊攻撃（砲撃）
-                if (lastSpecialAttackPressTime > 0 && Time.time - lastSpecialAttackPressTime > simultaneousPressWindow)
+                // 特殊攻撃 (X) → 砲撃弾発射
+                if (lastXPressTime > 0 && Time.time - lastXPressTime > simultaneousPressWindow)
                 {
                     character.AttackSpecial();
-                    lastSpecialAttackPressTime = -1f;
-                    isUltimateTriggered = false;
+                    lastXPressTime = -1f;
                 }
             }
 
-            if (WasNormalAttackReleased() || WasSpecialAttackReleased())
+            // ボタンが離されたら同時押しロックを解除
+            if (WasNormalAttackReleasedThisFrame() || WasSpecialAttackReleasedThisFrame())
             {
                 isUltimateTriggered = false;
-            }
-
-            // スタン攻撃
-            if (WasStunPressed())
-            {
-                character.AttackStun();
-            }
-        }
-
-        // ==========================================
-        // ブロック・パリーの処理
-        // ==========================================
-        private void HandleBlock()
-        {
-            if (WasBlockPressed())
-            {
-                character.StartBlock();
-            }
-            if (WasBlockReleased())
-            {
-                character.StopBlock();
             }
         }
     }
