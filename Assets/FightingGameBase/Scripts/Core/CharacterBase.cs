@@ -90,7 +90,7 @@ namespace FightingGameBase
         {
             // キャラクターセレクト経由で生成されたキャラクター（_P1 / _P2）以外で、
             // ゲームスタート時にHierarchyに最初から置かれていたキャラクターは即座に消去
-            if (!CharacterSelectManager.IsSpawningFromSelect && !name.EndsWith("_P1") && !name.EndsWith("_P2"))
+            if (!CharacterSelectManager.IsSpawningFromSelect && !name.Contains("P1") && !name.Contains("P2"))
             {
                 Destroy(gameObject);
                 return;
@@ -637,7 +637,7 @@ namespace FightingGameBase
         /// <summary>
         /// キャラクターをステージ真ん中にダイナミックに着地リスポーンさせます。
         /// </summary>
-        public void Respawn()
+        public virtual void Respawn()
         {
             // HP・状態のリセット
             currentHP = maxHP;
@@ -671,6 +671,8 @@ namespace FightingGameBase
             {
                 rb.linearVelocity = Vector2.zero;
             }
+
+            ResetActionStates();
 
             // 真ん中に上空からかっこよく着地するリスポーンシーケンスを開始
             respawnInvincibilityCoroutine = StartCoroutine(RespawnSequenceRoutine());

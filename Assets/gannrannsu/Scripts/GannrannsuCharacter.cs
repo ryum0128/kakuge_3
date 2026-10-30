@@ -1,94 +1,67 @@
-﻿using UnityEngine;
+using UnityEngine;
+using System.Collections;
 
 namespace FightingGameBase
 {
     // =================================================================================
     // 【GannrannsuCharacter（ガンランスキャラクター）】
-    // 浮遊するガンランスのキャラクター！
-    // CharacterBase（お手本）を継承して、ガンランス固有の能力を追加しています。
+    // CharacterBase（お手本）を継承し、ガンランス特有の能力を実装しています。
     // 特徴：
-    //   ・常に少し浮いている（重力が軽い）
-    //   ・特殊攻撃で「砲撃弾」を前方に飛ばす！
-    //   ・同時押し必殺技で「竜撃砲」（大ダメージ＋反動で後ろに下がる）
-    //
-    // 【技術的な解説】
-    //   CharacterBase の Move() や Jump() はそのまま使えます（継承の力！）。
-    //   ただし CharacterBase のメソッドは virtual（上書き可能）ではないため、
-    //   攻撃メソッドは「new」で隠して独自実装し、専用の入力コントローラー
-    //   （GannrannsuInputController）から呼び出す設計にしています。
-    //
-    //   初期化は Awake()（CharacterBase.Start() より先に実行される）で行い、
-    //   CharacterBase.Start() が正常に rb や animator を初期化できるようにしています。
+    //   ・低空ホバリング（軽やかな浮遊挙動）
+    //   ・通常攻撃：槍の突き（LanceHitbox、前方にスラスト）
+    //   ・特殊攻撃：砲撃発射（GannrannsuShell）
+    //   ・必殺技：竜撃砲（DragonBlastProjectile、大ダメージ＋後方反動）
+    //   ・ブロック／パリィ、ダッシュ／回避、スタンスキルも完全対応！
     // =================================================================================
     public class GannrannsuCharacter : CharacterBase
     {
         [Header("===== ガンランス専用設定 =====")]
 
-        [Tooltip("砲撃弾のプレハブ（飛んでいく弾）")]
+        [Tooltip("砲弾のプレハブ（飛ぶ弾）")]
         public GameObject shellPrefab;
 
-        [Tooltip("砲撃弾が出る位置（ランスの先端）")]
+        [Tooltip("砲弾が出る位置（槍の先端）")]
         public Transform firePoint;
 
-        [Tooltip("竜撃砲専用の攻撃判定オブジェクト（広い射程）")]
+        [Tooltip("竜撃砲用の攻撃オブジェクト")]
         public GameObject dragonBlastHitbox;
 
-        [Tooltip("砲撃弾の飛ぶ速さ")]
+        [Tooltip("砲弾の飛行速度")]
         public float shellSpeed = 12f;
 
-        [Tooltip("砲撃弾のダメージ")]
+        [Tooltip("砲弾のダメージ")]
         public int shellDamage = 15;
 
-        [Tooltip("竜撃砲のダメージ（必殺技！大ダメージ！）")]
+        [Tooltip("竜撃砲のダメージ")]
         public int dragonBlastDamage = 40;
 
-        [Tooltip("竜撃砲の反動で後ろに飛ばされる力")]
+        [Tooltip("竜撃砲発射時の後方への反動力")]
         public float dragonBlastRecoil = 8f;
 
-        [Tooltip("浮遊する力（この値の分だけ重力に逆らいます）")]
+        [Tooltip("浮力")]
         public float hoverForce = 15f;
 
         [Tooltip("浮遊する高さの上限")]
-        public float maxHoverHeight = 3f;
+        public float maxHoverHeight = 2.5f;
 
         [Header("===== 竜撃砲チャージ設定 =====")]
-        [Tooltip("竜撃砲のチャージに必要な時間（秒）（※後方互換性のため残しています。現在はチャージゲージ満タンで発動します）")]
         public float chargeRequiredTime = 1.5f;
-
-        // 現在チャージ中かどうか（※現在は使用されません）
         public bool isCharging { get; private set; }
 
         [Header("===== 竜撃砲ゲージ設定 =====")]
-        [Tooltip("チャージゲージの最大値")]
         public float maxChargeGauge = 100f;
-
-        [Tooltip("現在のチャージゲージ値")]
         public float chargeGauge = 0f;
-
-        [Tooltip("1秒あたりの自動チャージ量")]
         public float passiveChargeRate = 5f;
-
-        [Tooltip("通常攻撃（突き）が命中したときのチャージ増加量")]
         public float normalHitChargeGain = 10f;
-
-        [Tooltip("特殊攻撃（砲撃）が命中したときのチャージ増加量")]
         public float specialHitChargeGain = 20f;
 
         [Header("===== 竜撃砲クールタイム設定 =====")]
-        [Tooltip("竜撃砲のクールタイム（秒）")]
         public float ultimateAttackCooldown = 3.0f;
-
-        // 竜撃砲の残りクールタイム時間（秒）
         public float ultimateAttackCooldownTimer { get; private set; } = 0f;
 
-        [Header("===== 竜撃砲レーザーエフェクト設定 =====")]
-        [Tooltip("レーザーが表示される時間（秒）")]
+        [Header("===== レーザーエフェクト設定 =====")]
         public float laserDuration = 0.5f;
-
-        [Tooltip("レーザーの太さ")]
         public float laserWidth = 0.25f;
-
-        [Tooltip("レーザーの射程（ワールド単位）")]
         public float laserRange = 20f;
 
         // --- GUI用テクスチャとスタイル ---
@@ -96,87 +69,49 @@ namespace FightingGameBase
         private Texture2D fillTex;
         private GUIStyle textStyle;
 
-        // --- ガンランス専用の部品参照 ---
-        // ※ CharacterBase にも rb/animator がありますが private（非公開）なので、
-        //    ガンランス固有の処理（浮遊・竜撃砲の反動など）用に自分でも持っておきます。
         private Rigidbody2D myRb;
         private Animator myAnimator;
-        private bool isHovering = true; // 浮遊しているかどうか
+        private Transform visualsTransform;
+        private Vector3 originalVisualsPos;
+        private Coroutine activeVisualsAnimCoroutine;
+
+        private bool isHovering = true;
         private bool HasAnimator => myAnimator != null && myAnimator.runtimeAnimatorController != null;
-        private bool isAttacking = false; // 攻撃中かどうか
+        private bool isAttacking = false;
 
-        private System.Collections.IEnumerator SetAttackingState(float duration)
-        {
-            isAttacking = true;
-            yield return new WaitForSeconds(duration);
-            isAttacking = false;
-        }
+        // 攻撃中判定のオーバーライド（CharacterBase や AI と正しく連携）
+        public override bool IsAttacking => isAttacking;
 
-        // 移動とジャンプの上書き（チャージ中は動けないようにする）
-        public override void Move(float direction)
-        {
-            if (isDead) return;
-
-            if (isCharging)
-            {
-                // チャージ中は移動させないように速度を0にする
-                myRb.linearVelocity = new Vector2(0f, myRb.linearVelocity.y);
-                if (HasAnimator) myAnimator.SetFloat("Speed", 0f);
-                return;
-            }
-            base.Move(direction);
-        }
-
-        public override void Jump()
-        {
-            if (isDead || isCharging) return;
-            base.Jump();
-        }
-
-        // =========================================================
-        // チャージ制御メソッド
-        // =========================================================
-        public void StartCharge()
-        {
-            if (isDead) return;
-            isCharging = true;
-            if (HasAnimator) myAnimator.SetTrigger("StartCharge"); // アニメーション用トリガー
-            Debug.Log("ガンランス：竜撃砲チャージ開始！！エネルギー充填中...");
-        }
-
-        public void CancelCharge()
-        {
-            if (!isCharging || isDead) return;
-            isCharging = false;
-            if (HasAnimator) myAnimator.SetTrigger("CancelCharge");
-            Debug.Log("ガンランス：チャージキャンセル");
-        }
-
-        public void CompleteCharge()
-        {
-            if (!isCharging || isDead) return;
-            isCharging = false;
-            Debug.Log("ガンランス：チャージ完了！！竜撃砲を放ちます！");
-            AttackUltimate();
-        }
-
-        // Awake() は Start() より先に呼ばれるので、ここでガンランス固有のセットアップをします。
-        // こうすることで CharacterBase.Start() が正常に動きます！
         void Awake()
         {
             myRb = GetComponent<Rigidbody2D>();
+            // 親クラスの参照を確実にセット（Start前のNullReference防止）
+            rb = myRb;
+            mainCollider = GetComponent<Collider2D>();
             myAnimator = GetComponentInChildren<Animator>();
+            visualsTransform = transform.Find("Visuals");
+            if (visualsTransform != null)
+            {
+                originalVisualsPos = visualsTransform.localPosition;
+            }
 
-            // ガンランスは浮いているので、重力を軽くします！
-            myRb.gravityScale = 1.0f;
+            if (myRb != null)
+            {
+                myRb.gravityScale = 1.0f;
+            }
         }
 
-        // 基底クラスの Start() をオーバーライド（継承の初期化とコールバック登録）
         protected override void Start()
         {
             base.Start();
 
-            // 子オブジェクトからHitbox（通常攻撃）を取得して、命中時のコールバックを登録
+            // 親クラス Start で rb が再取得された後も重力スケールを確実に維持
+            if (rb != null)
+            {
+                rb.gravityScale = 1.0f;
+            }
+
+            // 通常攻撃用Hitboxのヒット時コールバック登録
             Hitbox[] hitboxes = GetComponentsInChildren<Hitbox>(true);
             foreach (var hb in hitboxes)
             {
@@ -190,9 +125,6 @@ namespace FightingGameBase
             }
         }
 
-        // Update() はガンランス固有の浮遊処理を行います。
-        // ※ これにより CharacterBase.Update() は隠れますが、
-        //    接地判定などの処理もここに含めているので大丈夫です。
         public override void ResetActionStates()
         {
             base.ResetActionStates();
@@ -201,32 +133,42 @@ namespace FightingGameBase
             {
                 CancelCharge();
             }
-            chargeGauge = 0f;
+            if (activeVisualsAnimCoroutine != null)
+            {
+                StopCoroutine(activeVisualsAnimCoroutine);
+                activeVisualsAnimCoroutine = null;
+            }
+            if (visualsTransform != null)
+            {
+                visualsTransform.localPosition = originalVisualsPos;
+            }
         }
 
         protected override void Update()
         {
-            if (isDead || GameManager.Instance != null && !GameManager.Instance.IsPlaying) return;
+            if (isDead || (GameManager.Instance != null && !GameManager.Instance.IsPlaying)) return;
 
-            // Call base.Update to charge stun gauge and run basic updates
+            // CharacterBase.Update（スタンゲージ加算、基本処理など）を実行
             base.Update();
 
             // --- 浮遊処理 ---
-            // 地面の近くまで落ちてきたら、上向きの力を加えて浮かせます
-            if (isHovering && transform.position.y < maxHoverHeight)
+            if (isHovering && transform.position.y < maxHoverHeight && myRb != null)
             {
                 myRb.AddForce(Vector2.up * hoverForce * Time.deltaTime, ForceMode2D.Force);
             }
 
-            // 接地判定（CharacterBase.Update() の代わり）
-            isGrounded = Mathf.Abs(myRb.linearVelocity.y) < 0.1f;
+            // 接地判定：地面とコライダーが接触しているか、または地面近くで安定している場合はジャンプ可能に
+            bool physicalGrounded = isGrounded; // base.Update() 内で CheckGrounded() された結果
+            bool nearFloor = transform.position.y <= (maxHoverHeight + 0.3f) && (myRb != null && Mathf.Abs(myRb.linearVelocity.y) < 2.5f);
+            isGrounded = physicalGrounded || nearFloor;
 
             if (HasAnimator)
             {
                 myAnimator.SetBool("IsHovering", isHovering);
+                myAnimator.SetBool("IsGrounded", isGrounded);
             }
 
-            // --- チャージゲージの自動蓄積 ---
+            // --- チャージゲージの自然増加 ---
             AddCharge(passiveChargeRate * Time.deltaTime);
 
             // --- クールタイムタイマーの更新 ---
@@ -236,24 +178,286 @@ namespace FightingGameBase
             }
         }
 
-        // チャージを増減させる関数
+        // 移動処理
+        public override void Move(float direction)
+        {
+            if (isDead || isStunned) return;
+
+            if (isCharging)
+            {
+                if (myRb != null) myRb.linearVelocity = new Vector2(0f, myRb.linearVelocity.y);
+                if (HasAnimator) myAnimator.SetFloat("Speed", 0f);
+                return;
+            }
+
+            base.Move(direction);
+        }
+
+        // ジャンプ処理
+        public override void Jump()
+        {
+            if (isDead || isCharging || isStunned) return;
+
+            // ガンランスは浮遊するため接地フラグが安定しにくいので、確実にジャンプできるようにする
+            if (!isGrounded && transform.position.y > maxHoverHeight + 0.5f) return;
+
+            isGrounded = false;
+            float force = stats != null ? stats.jumpForce : 10f;
+            if (myRb != null)
+            {
+                myRb.linearVelocity = new Vector2(myRb.linearVelocity.x, force);
+            }
+            else if (rb != null)
+            {
+                rb.linearVelocity = new Vector2(rb.linearVelocity.x, force);
+            }
+
+            if (HasAnimator) myAnimator.SetTrigger("Jump");
+        }
+
+        // チャージ制御
+        public void StartCharge()
+        {
+            if (isDead) return;
+            isCharging = true;
+            if (HasAnimator) myAnimator.SetTrigger("StartCharge");
+        }
+
+        public void CancelCharge()
+        {
+            if (!isCharging || isDead) return;
+            isCharging = false;
+            if (HasAnimator) myAnimator.SetTrigger("CancelCharge");
+        }
+
+        public void CompleteCharge()
+        {
+            if (!isCharging || isDead) return;
+            isCharging = false;
+            AttackUltimate();
+        }
+
+        // チャージゲージ増加
         public void AddCharge(float amount)
         {
             if (isDead) return;
             chargeGauge = Mathf.Clamp(chargeGauge + amount, 0f, maxChargeGauge);
         }
 
-        // --- GUI表示用の設定 ---
+        private IEnumerator SetAttackingState(float duration)
+        {
+            isAttacking = true;
+            yield return new WaitForSeconds(duration);
+            isAttacking = false;
+        }
+
+        // =========================================================
+        // 通常攻撃: 槍の突き（近接スラスト攻撃）
+        // =========================================================
+        public override void AttackNormal()
+        {
+            if (isDead || isAttacking || isStunned || IsHurtLocked) return;
+
+            if (HasAnimator) myAnimator.SetTrigger("AttackNormal");
+
+            // 攻撃硬直 0.22秒
+            StartCoroutine(SetAttackingState(0.22f));
+
+            // プロシージャルな突きアニメーション（槍を前に突き出して戻す）
+            if (visualsTransform != null)
+            {
+                if (activeVisualsAnimCoroutine != null) StopCoroutine(activeVisualsAnimCoroutine);
+                activeVisualsAnimCoroutine = StartCoroutine(AnimateThrust(0.22f));
+            }
+
+            // LanceHitbox を探して一時的に有効化
+            Hitbox[] hitboxes = GetComponentsInChildren<Hitbox>(true);
+            foreach (var hb in hitboxes)
+            {
+                if (hb.gameObject.name == "LanceHitbox")
+                {
+                    StartCoroutine(ActivateHitboxTemporarily(hb.gameObject, 0.20f));
+                    break;
+                }
+            }
+        }
+
+        private IEnumerator AnimateThrust(float duration)
+        {
+            float half = duration * 0.4f;
+            float elapsed = 0f;
+            Vector3 targetOffset = new Vector3(0.45f, 0f, 0f);
+
+            // 前方へ素早くスラスト
+            while (elapsed < half)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / half);
+                visualsTransform.localPosition = originalVisualsPos + targetOffset * Mathf.Sin(t * Mathf.PI * 0.5f);
+                yield return null;
+            }
+
+            // 元の位置へ戻る
+            elapsed = 0f;
+            float returnDuration = duration - half;
+            Vector3 startPos = visualsTransform.localPosition;
+            while (elapsed < returnDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / returnDuration);
+                visualsTransform.localPosition = Vector3.Lerp(startPos, originalVisualsPos, t);
+                yield return null;
+            }
+            visualsTransform.localPosition = originalVisualsPos;
+            activeVisualsAnimCoroutine = null;
+        }
+
+        // =========================================================
+        // 特殊攻撃: 砲撃発射
+        // =========================================================
+        public override void AttackSpecial()
+        {
+            if (isDead || isAttacking || isStunned || IsHurtLocked) return;
+
+            if (HasAnimator) myAnimator.SetTrigger("AttackSpecial");
+
+            // 攻撃硬直 0.3秒
+            StartCoroutine(SetAttackingState(0.30f));
+
+            // 反動アニメーション（少し後退して戻る）
+            if (visualsTransform != null)
+            {
+                if (activeVisualsAnimCoroutine != null) StopCoroutine(activeVisualsAnimCoroutine);
+                activeVisualsAnimCoroutine = StartCoroutine(AnimateRecoil(0.25f, 0.2f));
+            }
+
+            // 砲弾プレハブの生成
+            if (shellPrefab != null && firePoint != null)
+            {
+                GameObject shell = Instantiate(shellPrefab, firePoint.position, Quaternion.identity);
+                GannrannsuShell shellScript = shell.GetComponent<GannrannsuShell>();
+                if (shellScript != null)
+                {
+                    float direction = Mathf.Sign(transform.localScale.x);
+                    shellScript.Initialize(direction, shellSpeed, shellDamage, playerID, () =>
+                    {
+                        AddCharge(specialHitChargeGain);
+                    });
+                }
+            }
+            else
+            {
+                // フォールバック：firePointやプレハブがない場合
+                Vector3 spawnPos = firePoint != null ? firePoint.position : transform.position + new Vector3(Mathf.Sign(transform.localScale.x) * 1.2f, 0f, 0f);
+                GameObject shellObj = new GameObject("GannrannsuShell");
+                shellObj.transform.position = spawnPos;
+                var s = shellObj.AddComponent<GannrannsuShell>();
+                s.Initialize(Mathf.Sign(transform.localScale.x), shellSpeed, shellDamage, playerID, () =>
+                {
+                    AddCharge(specialHitChargeGain);
+                });
+            }
+        }
+
+        private IEnumerator AnimateRecoil(float duration, float recoilDistance)
+        {
+            float elapsed = 0f;
+            float kickDuration = duration * 0.25f;
+            Vector3 recoilOffset = new Vector3(-recoilDistance, 0.05f, 0f);
+
+            while (elapsed < kickDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / kickDuration);
+                visualsTransform.localPosition = originalVisualsPos + recoilOffset * t;
+                yield return null;
+            }
+
+            elapsed = 0f;
+            float recoverDuration = duration - kickDuration;
+            Vector3 startPos = visualsTransform.localPosition;
+            while (elapsed < recoverDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / recoverDuration);
+                visualsTransform.localPosition = Vector3.Lerp(startPos, originalVisualsPos, t);
+                yield return null;
+            }
+            visualsTransform.localPosition = originalVisualsPos;
+            activeVisualsAnimCoroutine = null;
+        }
+
+        // =========================================================
+        // 必殺技: 竜撃砲
+        // =========================================================
+        public override void AttackUltimate()
+        {
+            if (isDead || isAttacking || isStunned || IsHurtLocked) return;
+
+            chargeGauge = 0f;
+            ultimateAttackCooldownTimer = ultimateAttackCooldown;
+
+            if (HasAnimator) myAnimator.SetTrigger("AttackUltimate");
+
+            StartCoroutine(SetAttackingState(0.55f));
+
+            if (visualsTransform != null)
+            {
+                if (activeVisualsAnimCoroutine != null) StopCoroutine(activeVisualsAnimCoroutine);
+                activeVisualsAnimCoroutine = StartCoroutine(AnimateRecoil(0.45f, 0.5f));
+            }
+
+            // 竜撃砲の弾を生成
+            GameObject projObj = new GameObject("DragonBlastProjectile");
+            Vector3 spawnPos = firePoint != null ? firePoint.position : transform.position + new Vector3(Mathf.Sign(transform.localScale.x) * 1.5f, 0f, 0f);
+            projObj.transform.position = spawnPos;
+
+            DragonBlastProjectile proj = projObj.AddComponent<DragonBlastProjectile>();
+            float direction = Mathf.Sign(transform.localScale.x);
+            proj.Initialize(direction, 15f, dragonBlastDamage, playerID);
+
+            // 本体に後方への強力な反動を加える
+            float recoilDirection = -direction;
+            if (myRb != null)
+            {
+                myRb.AddForce(new Vector2(recoilDirection * dragonBlastRecoil, 2f), ForceMode2D.Impulse);
+            }
+        }
+
+        public override void TakeDamage(int damage, Hitbox attackerHitbox = null)
+        {
+            if (isDead) return;
+
+            isAttacking = false;
+            if (activeVisualsAnimCoroutine != null)
+            {
+                StopCoroutine(activeVisualsAnimCoroutine);
+                activeVisualsAnimCoroutine = null;
+            }
+            if (visualsTransform != null)
+            {
+                visualsTransform.localPosition = originalVisualsPos;
+            }
+
+            base.TakeDamage(damage, attackerHitbox);
+        }
+
+
+        protected new IEnumerator ActivateHitboxTemporarily(GameObject hitboxObj, float duration)
+        {
+            if (hitboxObj != null)
+            {
+                hitboxObj.SetActive(true);
+                yield return new WaitForSeconds(duration);
+                hitboxObj.SetActive(false);
+            }
+        }
+
+        // --- GUI表示 ---
         private void InitTextures()
         {
-            if (bgTex == null)
-            {
-                bgTex = MakeTex(2, 2, new Color(0f, 0f, 0f, 0.6f)); // 半透明の黒背景
-            }
-            if (fillTex == null)
-            {
-                fillTex = MakeTex(2, 2, Color.orange); // オレンジ色のゲージ
-            }
+            if (bgTex == null) bgTex = MakeTex(2, 2, new Color(0f, 0f, 0f, 0.6f));
+            if (fillTex == null) fillTex = MakeTex(2, 2, Color.orange);
             if (textStyle == null)
             {
                 textStyle = new GUIStyle();
@@ -267,10 +471,7 @@ namespace FightingGameBase
         private Texture2D MakeTex(int width, int height, Color col)
         {
             Color[] pix = new Color[width * height];
-            for (int i = 0; i < pix.Length; ++i)
-            {
-                pix[i] = col;
-            }
+            for (int i = 0; i < pix.Length; ++i) pix[i] = col;
             Texture2D result = new Texture2D(width, height);
             result.SetPixels(pix);
             result.Apply();
@@ -283,176 +484,38 @@ namespace FightingGameBase
             if (fillTex != null) Destroy(fillTex);
         }
 
-        // 画面上にチャージゲージを綺麗に表示します
         void OnGUI()
         {
             if (isDead) return;
             InitTextures();
 
-            // プレイヤーIDに応じて表示位置を左右に振り分けます
             float width = 200f;
             float height = 20f;
             float x = (playerID == 1) ? 20f : Screen.width - width - 20f;
-            float y = 90f; // 体力ゲージの下付近
+            float y = 90f;
 
-            // 背景描画
             GUI.DrawTexture(new Rect(x, y, width, height), bgTex);
 
-            // ゲージの割合幅を計算
             float fillRatio = chargeGauge / maxChargeGauge;
             float fillWidth = (width - 4f) * fillRatio;
-            
+
             Color barColor = Color.orange;
-            string text = $"竜撃砲 CHARGE: {Mathf.Floor(chargeGauge)}%";
-            
-            // 満タン時のピカピカ点滅エフェクト
+            string text = $"CHARGE: {Mathf.Floor(chargeGauge)}%";
+
             if (chargeGauge >= maxChargeGauge)
             {
                 float flash = Mathf.PingPong(Time.time * 4f, 1f);
                 barColor = Color.Lerp(new Color(1f, 0.3f, 0f), new Color(1f, 0.9f, 0f), flash);
-                
-                string keyLabel = "K+L";
-                var inputController = GetComponent<GannrannsuInputController>();
-                if (inputController != null)
-                {
-                    keyLabel = $"{inputController.normalAttackKey}+{inputController.specialAttackKey}";
-                }
-                else
-                {
-                    var playerInput = GetComponent<PlayerInputController>();
-                    if (playerInput != null)
-                    {
-                        keyLabel = $"{playerInput.normalAttackKey}+{playerInput.specialAttackKey}";
-                    }
-                }
-                text = $"竜撃砲 READY! ({keyLabel})";
+
+                string keyLabel = (playerID == 1) ? "J+K" : "1+2 / U+I";
+                text = $"READY! ({keyLabel})";
             }
-            
-            // ゲージ描画
+
             GUI.color = barColor;
             GUI.DrawTexture(new Rect(x + 2f, y + 2f, fillWidth, height - 4f), fillTex);
-            GUI.color = Color.white; // リセット
+            GUI.color = Color.white;
 
-            // テキスト表示
             GUI.Label(new Rect(x, y, width, height), text, textStyle);
-        }
-
-        // =========================================================
-        // 通常攻撃: ランスの突き（お手本と同じ近距離攻撃）
-        // ※ GannrannsuInputController から呼ばれます
-        // =========================================================
-        public override void AttackNormal()
-        {
-            if (isDead || isAttacking) return;
-
-            if (HasAnimator) myAnimator.SetTrigger("AttackNormal");
-            Debug.Log("ガンランス：突き攻撃！");
-
-            // 攻撃状態をセット (突き攻撃の硬直時間は 0.25 秒)
-            StartCoroutine(SetAttackingState(0.25f));
-
-            // 子オブジェクトからHitbox（攻撃判定）を探して、一時的にオンにします
-            Hitbox hitbox = GetComponentInChildren<Hitbox>(true);
-            if (hitbox != null)
-            {
-                StartCoroutine(ActivateHitboxTemporarily(hitbox.gameObject, 0.25f));
-            }
-        }
-
-        // =========================================================
-        // 特殊攻撃: 砲撃弾を飛ばす！（遠距離攻撃）
-        // =========================================================
-        public override void AttackSpecial()
-        {
-            if (isDead || isAttacking) return;
-
-            if (HasAnimator) myAnimator.SetTrigger("AttackSpecial");
-            Debug.Log("ガンランス：砲撃発射！！");
-
-            // 攻撃状態をセット (砲撃硬直時間は 0.35 秒)
-            StartCoroutine(SetAttackingState(0.35f));
-
-            // 砲撃弾のプレハブが設定されていれば、弾を生成して飛ばします
-            if (shellPrefab != null && firePoint != null)
-            {
-                // 弾を作成します（位置はfirePoint、回転はなし）
-                GameObject shell = Instantiate(shellPrefab, firePoint.position, Quaternion.identity);
-
-                // 弾のスクリプトに設定を渡します
-                GannrannsuShell shellScript = shell.GetComponent<GannrannsuShell>();
-                if (shellScript != null)
-                {
-                    // キャラクターが向いている方向を取得します
-                    float direction = Mathf.Sign(transform.localScale.x);
-                    shellScript.Initialize(direction, shellSpeed, shellDamage, playerID);
-                }
-            }
-            else
-            {
-                Debug.LogWarning("砲撃弾のプレハブか発射位置が設定されていません！");
-            }
-        }
-
-        // =========================================================
-        // 必殺技: 竜撃砲！（同時押しで発動する大技）
-        // =========================================================
-        public override void AttackUltimate()
-        {
-            if (isDead || isAttacking) return;
-
-            // 必殺技発動時にゲージを消費してゼロに戻す
-            chargeGauge = 0f;
-
-            // クールタイムタイマーを設定
-            ultimateAttackCooldownTimer = ultimateAttackCooldown;
-
-            if (HasAnimator) myAnimator.SetTrigger("AttackUltimate");
-            Debug.Log("ガンランス：竜撃砲発動！！！");
-
-            // 攻撃状態をセット (竜撃砲の反動と硬直時間は 0.6 秒)
-            StartCoroutine(SetAttackingState(0.6f));
-
-            // --- 竜撃砲の弾（とび道具）を生成して飛ばす ---
-            GameObject projObj = new GameObject("DragonBlastProjectile");
-            
-            // 発射位置の決定（firePointがあればそこ、無ければ自分の位置）
-            Vector3 spawnPos = firePoint != null ? firePoint.position : transform.position;
-            projObj.transform.position = spawnPos;
-
-            // コンポーネントのアタッチと初期化
-            DragonBlastProjectile proj = projObj.AddComponent<DragonBlastProjectile>();
-            
-            float direction = Mathf.Sign(transform.localScale.x);
-            // 弾速は少し速めの 15f で飛んでいくようにします
-            proj.Initialize(direction, 15f, dragonBlastDamage, playerID);
-
-            // --- 反動で後ろに吹っ飛びます ---
-            float recoilDirection = -Mathf.Sign(transform.localScale.x);
-            myRb.AddForce(new Vector2(recoilDirection * dragonBlastRecoil, 2f), ForceMode2D.Impulse);
-        }
-
-        // =========================================================
-        // ダメージを受けた時の処理（攻撃キャンセルの追加）
-        // =========================================================
-        public override void TakeDamage(int damage, Hitbox attackerHitbox = null)
-        {
-            if (isDead) return;
-
-            // 被ダメージ時は攻撃を中断し、攻撃状態をリセットする
-            isAttacking = false;
-            StopAllCoroutines();
-
-            base.TakeDamage(damage, attackerHitbox);
-        }
-
-
-
-        // ActivateHitboxTemporarily はお手本（CharacterBase）と同じ仕組みです
-        protected new System.Collections.IEnumerator ActivateHitboxTemporarily(GameObject hitboxObj, float duration)
-        {
-            hitboxObj.SetActive(true);  // 攻撃判定をオン
-            yield return new WaitForSeconds(duration);
-            hitboxObj.SetActive(false); // 攻撃判定をオフ
         }
     }
 }
