@@ -80,6 +80,7 @@ namespace FightingGameBase
         public float currentMana = 50f; // Starts with 50 Mana
         public float manaRegenSpeed = 8f; // Mana recovery speed per second
         public bool isBlockingState = false;
+        [HideInInspector] public CustomSpecialSkill customSpecialSkill;
 
         protected Rigidbody2D rb;
         protected Animator animator;
@@ -90,7 +91,7 @@ namespace FightingGameBase
         {
             // キャラクターセレクト経由で生成されたキャラクター（_P1 / _P2）以外で、
             // ゲームスタート時にHierarchyに最初から置かれていたキャラクターは即座に消去
-            if (!CharacterSelectManager.IsSpawningFromSelect && !name.EndsWith("_P1") && !name.EndsWith("_P2"))
+            if (CharacterSelectManager.Instance != null && CharacterSelectManager.Instance.IsSelectingPhase && !name.Contains("_P1") && !name.Contains("_P2") && !name.Contains("P1") && !name.Contains("P2"))
             {
                 Destroy(gameObject);
                 return;
@@ -291,7 +292,7 @@ namespace FightingGameBase
 
         public virtual void AttackNormal()
         {
-            if (isDead || isStunned) return;
+            if (isDead || isStunned || isBlockingState) return;
 
             SafeSetTrigger("AttackNormal");
             Debug.Log("Normal attack triggered.");
@@ -322,13 +323,27 @@ namespace FightingGameBase
         /// <summary>
         /// 騾壼ｸｸ謾ｻ謦・ｸｭ繧・せ繝ｩ繝逋ｺ蜍穂ｸｭ縺ｧ繧ゅせ繝壹す繝｣繝ｫ謾ｻ謦・ｼ育椪髢鍋ｧｻ蜍慕ｭ会ｼ峨・蜈･蜉帙ｒ險ｱ蜿ｯ縺吶ｋ縺九←縺・°
         /// </summary>
-        public virtual bool CanInputSpecialDuringAttack => false;
+        public virtual bool CanInputSpecialDuringAttack
+        {
+            get
+            {
+                if (customSpecialSkill != null && customSpecialSkill.IsActive)
+                {
+                    return customSpecialSkill.CanInputSpecialDuringAttack;
+                }
+                return false;
+            }
+        }
 
         /// <summary>
         /// キャラクターの全体的（スペシャル等）なクールダウンの残り時間（秒）を取得します。
         /// </summary>
         public virtual float GetCooldownRemaining()
         {
+            if (customSpecialSkill != null && customSpecialSkill.IsActive)
+            {
+                return customSpecialSkill.GetCooldownRemaining();
+            }
             return 0f;
         }
 
@@ -337,6 +352,10 @@ namespace FightingGameBase
         /// </summary>
         public virtual float GetCooldownDuration()
         {
+            if (customSpecialSkill != null && customSpecialSkill.IsActive)
+            {
+                return customSpecialSkill.GetCooldownDuration();
+            }
             return 0f;
         }
 
@@ -348,6 +367,11 @@ namespace FightingGameBase
             if (IsSpecialSilenced())
             {
                 return "<color=#cc44ff>封印中</color>";
+            }
+
+            if (customSpecialSkill != null && customSpecialSkill.IsActive)
+            {
+                return customSpecialSkill.GetCooldownStatusText();
             }
 
             float remaining = GetCooldownRemaining();
@@ -387,7 +411,12 @@ namespace FightingGameBase
 
         public virtual void AttackSpecial()
         {
-            if (isDead || isStunned) return;
+            if (isDead || isStunned || isBlockingState) return;
+            if (customSpecialSkill != null && customSpecialSkill.IsActive)
+            {
+                customSpecialSkill.ExecuteSpecial();
+                return;
+            }
             if (IsSpecialSilenced())
             {
                 Debug.Log($"[Silence] {name} は影の領域（沈黙フィールド）内にいるためスペシャル攻撃を使用できない！");

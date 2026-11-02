@@ -353,6 +353,12 @@ namespace FightingGameBase
 
         public override void AttackSpecial()
         {
+            if (isDead || isStunned || isBlockingState) return;
+            if (customSpecialSkill != null && customSpecialSkill.IsActive)
+            {
+                customSpecialSkill.ExecuteSpecial();
+                return;
+            }
             if (isDead || isSwinging || isBlocking || isGuardBroken || isDashingOrEvading || IsHurtLocked) return;
 
             if (IsSpecialSilenced())
@@ -685,7 +691,8 @@ namespace FightingGameBase
             if (opponent != null)
             {
                 float faceDir = transform.localScale.x; // 1 = right, -1 = left
-                float relativeX = opponent.transform.position.x - transform.position.x;
+                Vector3 attackOrigin = (attackerHitbox != null && Mathf.Abs(attackerHitbox.transform.position.x - transform.position.x) > 0.05f) ? attackerHitbox.transform.position : opponent.transform.position;
+                float relativeX = attackOrigin.x - transform.position.x;
                 
                 // If facing right but opponent is on left, or facing left but opponent is on right -> Back attack!
                 if ((faceDir > 0 && relativeX < 0) || (faceDir < 0 && relativeX > 0))
@@ -694,7 +701,7 @@ namespace FightingGameBase
                 }
             }
 
-            if (isBlocking && !isBackAttack)
+            if (isBlocking)
             {
                 if (isParrying)
                 {
@@ -726,9 +733,9 @@ namespace FightingGameBase
                         }
                     }
 
-                    StartCoroutine(ParrySuccessRoutine());
+                    StartCoroutine(ParrySuccessRoutine()); return;
                 }
-                else
+                else if (!isBackAttack)
                 {
                     // --- DeepWoken Block Success ---
                     Debug.Log("Block success. Posture accumulating.");

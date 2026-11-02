@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using System.Collections;
 
 namespace FightingGameBase
@@ -47,6 +47,9 @@ namespace FightingGameBase
 
         void Start()
         {
+            // 床を生成・確認
+            FloorManager.EnsureFloorExists();
+
             // 透明なステージ壁を生成・確認
             EnsureStageBoundaries();
 

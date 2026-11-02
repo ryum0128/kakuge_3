@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace FightingGameBase
@@ -266,6 +266,13 @@ namespace FightingGameBase
             bool normalAttackDown = WasKeyPressedThisFrame(normalAttackKey);
             bool specialAttackDown = WasKeyPressedThisFrame(specialAttackKey);
 
+            // クナイ設置済みで攻撃中の場合、特殊攻撃キーが押されたら即座に瞬間移動を発動（攻撃モーションを継続しながらテレポート）
+            if (character.CanInputSpecialDuringAttack && specialAttackDown && !character.isBlockingState)
+            {
+                character.AttackSpecial();
+                return;
+            }
+
             // 押されたら、その時のゲーム内時間を記録しておきます
             if (normalAttackDown) lastNormalAttackPressTime = Time.time;
             if (specialAttackDown) lastSpecialAttackPressTime = Time.time;
@@ -282,7 +289,7 @@ namespace FightingGameBase
             if (isSimultaneous)
             {
                 // 同時押し（必殺技）
-                if (!isUltimateTriggered)
+                if (!isUltimateTriggered && !character.isBlockingState)
                 {
                     character.AttackUltimate();
                     isUltimateTriggered = true; // 暴発を防ぐためのロックをかけます
@@ -300,7 +307,7 @@ namespace FightingGameBase
                 // 押してから少し時間が経った（同時押しじゃないと確定した）場合に出ます
                 if (lastNormalAttackPressTime > 0 && Time.time - lastNormalAttackPressTime > simultaneousPressWindow)
                 {
-                    character.AttackNormal();
+                    if (!character.isBlockingState) character.AttackNormal();
                     lastNormalAttackPressTime = -1f;
                     isUltimateTriggered = false;
                 }
@@ -308,7 +315,7 @@ namespace FightingGameBase
                 // 特殊攻撃 (K)
                 if (lastSpecialAttackPressTime > 0 && Time.time - lastSpecialAttackPressTime > simultaneousPressWindow)
                 {
-                    character.AttackSpecial();
+                    if (!character.isBlockingState) character.AttackSpecial();
                     lastSpecialAttackPressTime = -1f;
                     isUltimateTriggered = false;
                 }

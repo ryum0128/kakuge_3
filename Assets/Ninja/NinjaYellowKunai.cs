@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 
 namespace FightingGameBase
@@ -75,14 +75,7 @@ namespace FightingGameBase
             // 少しだけ大きいサイズ（標準クナイの約1.45倍）
             transform.localScale = Vector3.one * 1.45f;
 
-            // 2. 黄色い電光オーラ
-            GameObject auraObj = new GameObject("KunaiAura");
-            auraObj.transform.SetParent(transform, false);
-            auraRenderer = auraObj.AddComponent<SpriteRenderer>();
-            auraRenderer.sprite = GetOrCreateCircleSprite();
-            auraRenderer.color = new Color(1.0f, 0.90f, 0.15f, 0.40f);
-            auraRenderer.sortingOrder = 8;
-            auraObj.transform.localScale = new Vector3(1.6f, 0.85f, 1f);
+            // 黄色い球体オーラは非表示（残像防止）
 
             // 3. 当たり判定（Hitbox & Trigger）
             CircleCollider2D circle = gameObject.AddComponent<CircleCollider2D>();
@@ -110,11 +103,34 @@ namespace FightingGameBase
             {
                 CharacterBase target = hurtbox.owner;
 
-                // 【パリー判定】相手がパリー受け付け中であれば、クナイは消滅する！
-                if (target.IsInParryWindow())
+                // 向き判定（クナイの飛来方向を相手が向いているか）
+                float faceDir = target.transform.localScale.x;
+                float relX = transform.position.x - target.transform.position.x;
+                bool isFacingKunai = (faceDir > 0 && relX > 0) || (faceDir < 0 && relX < 0);
+
+                // 相手がガード状態かどうか
+                bool isGuarding = target.isBlockingState;
+                if (!isGuarding && target is NinjaCharacter ninja && ninja.isBlocking)
                 {
-                    Debug.Log($"[NinjaYellowKunai] ★ 敵 (P{target.playerID}) がクナイをパリー！クナイは弾かれて消滅しました ★");
-                    Dispel(true); // wasParried = true
+                    isGuarding = true;
+                }
+
+                // 【パリー判定】相手がパリー受け付け中で、かつクナイを向いている場合
+                if (target.IsInParryWindow() && isFacingKunai)
+                {
+                    hasDealtDamage = true;
+                    Debug.Log($"[NinjaYellowKunai] ★ 敵 (P{target.playerID}) がクナイをパリー！クナイは消滅しました ★");
+                    Dispel(true); // wasParried = true（パリーで消滅、黄色い球エフェクトなし）
+                    return;
+                }
+
+                // 【ガード判定】相手がガード中で、かつクナイを向いている場合
+                // ガード貫通しない：ガード成立時は貫通せず即座に消滅（弾かれる）
+                if (isGuarding && isFacingKunai)
+                {
+                    hasDealtDamage = true;
+                    Debug.Log($"[NinjaYellowKunai] 敵 (P{target.playerID}) がクナイをガード！ガード貫通せずクナイは消滅しました。");
+                    Dispel(false); // wasParried = false（ガード成立で消滅、貫通しない）
                     return;
                 }
 
@@ -209,11 +225,7 @@ namespace FightingGameBase
             // 設置後は多重ヒットを防ぐため当たり判定をOFF
             if (kunaiCol != null) kunaiCol.enabled = false;
 
-            // 着地時の小爆発・衝撃波エフェクト
-            StartCoroutine(SpawnGroundImpactVFX());
-
-            // 飛雷神マーカー波紋アニメーションを開始
-            StartCoroutine(PlantedMarkerPulseRoutine());
+            // 着地時の球体・波紋エフェクトは無効化（残像防止）
 
             Debug.Log("[NinjaYellowKunai] ★ クナイが地面に設置完了しました！3回目の入力で黄色い閃光とともに瞬間移動可能 ★");
         }
@@ -228,75 +240,6 @@ namespace FightingGameBase
             }
         }
 
-        private IEnumerator PlantedMarkerPulseRoutine()
-        {
-            while (CurrentState == KunaiState.Placed)
-            {
-                // 地面に黄色い波紋リングがフワッと広がる
-                GameObject wave = new GameObject("MarkerWave");
-                wave.transform.SetParent(transform, false);
-                wave.transform.localPosition = Vector3.zero;
-                SpriteRenderer waveSr = wave.AddComponent<SpriteRenderer>();
-                waveSr.sprite = GetOrCreateCircleSprite();
-                waveSr.color = new Color(1.0f, 0.88f, 0.2f, 0.75f);
-                waveSr.sortingOrder = 7;
-
-                float waveDuration = 0.65f;
-                float wElapsed = 0f;
-                while (wElapsed < waveDuration && CurrentState == KunaiState.Placed)
-                {
-                    wElapsed += Time.deltaTime;
-                    float t = Mathf.Clamp01(wElapsed / waveDuration);
-                    if (wave != null)
-                    {
-                        wave.transform.localScale = Vector3.one * Mathf.Lerp(0.4f, 2.8f, t);
-                        waveSr.color = new Color(1.0f, 0.88f, 0.2f, Mathf.Lerp(0.75f, 0f, t));
-                    }
-                    yield return null;
-                }
-
-                if (wave != null) Destroy(wave);
-                yield return new WaitForSeconds(0.25f);
-            }
-        }
-
-        private IEnumerator SpawnGroundImpactVFX()
-        {
-            for (int i = 0; i < 4; i++)
-            {
-                GameObject spark = new GameObject("Spark");
-                spark.transform.position = transform.position + new Vector3(Random.Range(-0.2f, 0.2f), Random.Range(0f, 0.3f), 0f);
-                SpriteRenderer sparkSr = spark.AddComponent<SpriteRenderer>();
-                sparkSr.sprite = GetOrCreateCircleSprite();
-                sparkSr.color = new Color(1f, 0.95f, 0.3f, 0.9f);
-                sparkSr.sortingOrder = 10;
-                spark.transform.localScale = Vector3.one * Random.Range(0.12f, 0.22f);
-                StartCoroutine(FadeSparkRoutine(spark, new Vector2(Random.Range(-2f, 2f), Random.Range(1.5f, 3.5f))));
-            }
-            yield return null;
-        }
-
-        private IEnumerator FadeSparkRoutine(GameObject spark, Vector2 velocity)
-        {
-            float elapsed = 0f;
-            float duration = 0.25f;
-            SpriteRenderer sr = spark.GetComponent<SpriteRenderer>();
-
-            while (elapsed < duration && spark != null)
-            {
-                elapsed += Time.deltaTime;
-                float t = Mathf.Clamp01(elapsed / duration);
-                spark.transform.position += (Vector3)(velocity * Time.deltaTime);
-                if (sr != null)
-                {
-                    sr.color = new Color(1f, 0.95f, 0.3f, 1f - t);
-                }
-                yield return null;
-            }
-
-            if (spark != null) Destroy(spark);
-        }
-
         /// <summary>
         /// クナイの消滅処理（パリーされた場合またはテレポート完了後）
         /// </summary>
@@ -307,32 +250,21 @@ namespace FightingGameBase
 
             OnDispelled?.Invoke(this);
 
+            // テレポート後や消滅時に残像・エフェクトが残らないよう即座にレンダラーを非表示
+            foreach (var sr in GetComponentsInChildren<SpriteRenderer>())
+            {
+                if (sr != null) sr.enabled = false;
+            }
+
             if (wasParried)
             {
                 AudioManager.PlayParrySound();
-                StartCoroutine(SpawnParrySparks(transform.position));
             }
 
             Destroy(gameObject);
         }
 
-        private IEnumerator SpawnParrySparks(Vector3 pos)
-        {
-            for (int i = 0; i < 6; i++)
-            {
-                GameObject spark = new GameObject("ParrySpark");
-                spark.transform.position = pos;
-                SpriteRenderer sr = spark.AddComponent<SpriteRenderer>();
-                sr.sprite = GetOrCreateCircleSprite();
-                sr.color = new Color(1.0f, 1.0f, 0.8f, 1.0f);
-                sr.sortingOrder = 15;
-                spark.transform.localScale = Vector3.one * 0.18f;
 
-                Vector2 vel = new Vector2(Random.Range(-4f, 4f), Random.Range(-2f, 4f));
-                StartCoroutine(FadeSparkRoutine(spark, vel));
-            }
-            yield return null;
-        }
 
         // =========================================================================
         // プロシージャル クナイ テクスチャ生成

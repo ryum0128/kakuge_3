@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System.Collections;
 
 namespace FightingGameBase
@@ -324,6 +324,12 @@ namespace FightingGameBase
         // 前に３歩進んで１歩ずつに斬撃を入れる（通常攻撃を３回するようなもの）
         public override void AttackSpecial()
         {
+            if (isDead || isStunned || isBlockingState) return;
+            if (customSpecialSkill != null && customSpecialSkill.IsActive)
+            {
+                customSpecialSkill.ExecuteSpecial();
+                return;
+            }
             if (isDead || isSwinging || isSpecialAttacking || isDashingOrEvading || IsHurtLocked) return;
 
             if (currentMana < 20f)
@@ -599,7 +605,8 @@ namespace FightingGameBase
             if (opponent != null)
             {
                 float faceDir = transform.localScale.x; // 1 = right, -1 = left
-                float relativeX = opponent.transform.position.x - transform.position.x;
+                Vector3 attackOrigin = (attackerHitbox != null && Mathf.Abs(attackerHitbox.transform.position.x - transform.position.x) > 0.05f) ? attackerHitbox.transform.position : opponent.transform.position;
+                float relativeX = attackOrigin.x - transform.position.x;
                 
                 // If facing right but opponent is on left, or facing left but opponent is on right -> Back attack!
                 if ((faceDir > 0 && relativeX < 0) || (faceDir < 0 && relativeX > 0))
@@ -608,7 +615,7 @@ namespace FightingGameBase
                 }
             }
 
-            if (isBlocking && !isBackAttack)
+            if (isBlocking)
             {
                 if (isParrying)
                 {
@@ -625,9 +632,9 @@ namespace FightingGameBase
                     // パリー成功報酬としてマナを少量(6f)回復する
                     AddMana(6f);
 
-                    StartCoroutine(ParrySuccessRoutine());
+                    StartCoroutine(ParrySuccessRoutine()); return;
                 }
-                else
+                else if (!isBackAttack)
                 {
                     Debug.Log("ダガーブロック成功！ダメージを防いだ！");
                     

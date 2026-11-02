@@ -553,6 +553,12 @@ namespace FightingGameBase
 
         public override void AttackSpecial()
         {
+            if (isDead || isStunned || isBlockingState) return;
+            if (customSpecialSkill != null && customSpecialSkill.IsActive)
+            {
+                customSpecialSkill.ExecuteSpecial();
+                return;
+            }
             if (isDead || isSwinging || isSpecialAttacking || isBlocking || isGuardBroken || isDashingOrEvading || IsHurtLocked || isStunned) return;
 
             // 1. クールダウン判定（25秒）
@@ -778,14 +784,15 @@ namespace FightingGameBase
             if (opponent != null)
             {
                 float faceDir = transform.localScale.x;
-                float relativeX = opponent.transform.position.x - transform.position.x;
+                Vector3 attackOrigin = (attackerHitbox != null && Mathf.Abs(attackerHitbox.transform.position.x - transform.position.x) > 0.05f) ? attackerHitbox.transform.position : opponent.transform.position;
+                float relativeX = attackOrigin.x - transform.position.x;
                 if ((faceDir > 0 && relativeX < 0) || (faceDir < 0 && relativeX > 0))
                 {
                     isBackAttack = true;
                 }
             }
 
-            if (isBlocking && !isBackAttack)
+            if (isBlocking)
             {
                 if (isParrying)
                 {
@@ -808,9 +815,9 @@ namespace FightingGameBase
                         }
                     }
 
-                    StartCoroutine(ParrySuccessRoutine());
+                    StartCoroutine(ParrySuccessRoutine()); return;
                 }
-                else
+                else if (!isBackAttack)
                 {
                     // --- DeepWoken Block Success ---
                     Debug.Log("[Shadow] Block success. Posture accumulating.");

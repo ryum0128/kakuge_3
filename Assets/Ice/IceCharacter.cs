@@ -43,7 +43,7 @@ namespace FightingGameBase
         [Tooltip("凍結効果の持続時間（秒）")]
         public float freezeDuration = 1.5f;
         [Tooltip("凍結効果の再発動クールダウン（秒）")]
-        public float freezeCooldown = 5.0f;
+        public float freezeCooldown = 0.5f;
 
         [Header("ブロック・パリー設定（全キャラ共通仕様）")]
         [Tooltip("パリー受付時間（秒）")]
@@ -446,6 +446,12 @@ namespace FightingGameBase
 
         public override void AttackSpecial()
         {
+            if (isDead || isStunned || isBlockingState) return;
+            if (customSpecialSkill != null && customSpecialSkill.IsActive)
+            {
+                customSpecialSkill.ExecuteSpecial();
+                return;
+            }
             if (isDead || isSwinging || isSpecialAttacking || isBlocking || isGuardBroken || isDashingOrEvading || IsHurtLocked || isStunned) return;
 
             if (IsSpecialSilenced())
@@ -887,14 +893,15 @@ namespace FightingGameBase
             if (opponent != null)
             {
                 float faceDir = transform.localScale.x;
-                float relativeX = opponent.transform.position.x - transform.position.x;
+                Vector3 attackOrigin = (attackerHitbox != null && Mathf.Abs(attackerHitbox.transform.position.x - transform.position.x) > 0.05f) ? attackerHitbox.transform.position : opponent.transform.position;
+                float relativeX = attackOrigin.x - transform.position.x;
                 if ((faceDir > 0 && relativeX < 0) || (faceDir < 0 && relativeX > 0))
                 {
                     isBackAttack = true;
                 }
             }
 
-            if (isBlocking && !isBackAttack)
+            if (isBlocking)
             {
                 if (isParrying)
                 {
@@ -925,9 +932,9 @@ namespace FightingGameBase
                         }
                     }
 
-                    StartCoroutine(ParrySuccessRoutine());
+                    StartCoroutine(ParrySuccessRoutine()); return;
                 }
-                else
+                else if (!isBackAttack)
                 {
                     // --- DeepWoken Block Success ---
                     Debug.Log("[Ice] Block success. Posture accumulating.");

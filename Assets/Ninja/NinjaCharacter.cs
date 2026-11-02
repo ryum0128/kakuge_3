@@ -560,6 +560,12 @@ namespace FightingGameBase
         // =========================================================================
         public override void AttackSpecial()
         {
+            if (isDead || isStunned || isBlockingState) return;
+            if (customSpecialSkill != null && customSpecialSkill.IsActive)
+            {
+                customSpecialSkill.ExecuteSpecial();
+                return;
+            }
             if (isDead || isGuardBroken || isStunned) return;
 
             if (IsSpecialSilenced())
@@ -650,9 +656,8 @@ namespace FightingGameBase
                 if (activeKunai == k) activeKunai = null;
             };
 
-            // 投擲時の電光閃光と効果音
+            // 投擲時の効果音
             AudioManager.PlayWarningSound();
-            SpawnYellowFlash(spawnPos, 0.65f);
 
             Debug.Log($"[Ninja] P{playerID} Step 1: Throw Kunai (Damage: {kunaiDamage})");
         }
@@ -667,8 +672,7 @@ namespace FightingGameBase
             Vector3 destination = activeKunai.transform.position + Vector3.up * 0.25f;
             Vector3 origin = transform.position;
 
-            // 1. 出発地点に「黄色い閃光（Yellow Flash）」エフェクト
-            SpawnYellowFlash(origin, 1.2f);
+            // テレポート音の再生
             AudioManager.PlayTeleportSound();
 
             // 2. 瞬間移動！
@@ -699,8 +703,7 @@ namespace FightingGameBase
                 }
             }
 
-            // 3. 到着地点に「黄色い閃光」エフェクト＆画面振動
-            SpawnYellowFlash(destination, 1.35f);
+            // 画面振動
             if (HUDManager.Instance != null)
             {
                 HUDManager.Instance.TriggerScreenShake(0.20f, 0.12f);
@@ -739,14 +742,6 @@ namespace FightingGameBase
             flashBolt.transform.localScale = new Vector3(0.3f * scale, 2.4f * scale, 1f);
             flashBolt.transform.rotation = Quaternion.Euler(0f, 0f, Random.Range(-35f, 35f));
 
-            GameObject flashGlow = new GameObject("YellowFlashGlow");
-            flashGlow.transform.position = position;
-            SpriteRenderer glowSr = flashGlow.AddComponent<SpriteRenderer>();
-            glowSr.sprite = GetOrCreateCircleSprite();
-            glowSr.color = new Color(1.0f, 0.85f, 0.1f, 0.75f);
-            glowSr.sortingOrder = 15;
-            flashGlow.transform.localScale = Vector3.one * (1.8f * scale);
-
             float duration = 0.22f;
             float elapsed = 0f;
             while (elapsed < duration)
@@ -760,17 +755,10 @@ namespace FightingGameBase
                     flashBolt.transform.localScale = new Vector3(Mathf.Lerp(0.3f, 0.05f, t) * scale, (2.4f + t * 0.8f) * scale, 1f);
                 }
 
-                if (flashGlow != null)
-                {
-                    glowSr.color = new Color(1.0f, 0.85f, 0.1f, Mathf.Lerp(0.75f, 0f, t));
-                    flashGlow.transform.localScale = Vector3.one * ((1.8f + t * 1.5f) * scale);
-                }
-
                 yield return null;
             }
 
             if (flashBolt != null) Destroy(flashBolt);
-            if (flashGlow != null) Destroy(flashGlow);
         }
 
         // =========================================================================
@@ -783,6 +771,7 @@ namespace FightingGameBase
             CancelCharge();
 
             isBlocking = true;
+            isBlockingState = true;
             if (blockShield != null) blockShield.SetActive(true);
 
             if (Time.time - lastParryTime >= parryCooldown)
@@ -796,6 +785,7 @@ namespace FightingGameBase
         public override void StopBlock()
         {
             isBlocking = false;
+            isBlockingState = false;
             isParrying = false;
             if (blockShield != null) blockShield.SetActive(false);
             if (parryWindowCoroutine != null)
@@ -861,6 +851,109 @@ namespace FightingGameBase
 
             isGuardBroken = false;
             Debug.Log($"[Ninja] P{playerID} Recovered from guard break");
+        }
+
+        // =========================================================================
+        // 被ダメージ ＆ ガード / パリー処理
+        // =========================================================================
+        public override void TakeDamage(int damage, Hitbox attackerHitbox = null)
+        {
+            if (isDead || isInvincible) return;
+
+            // 攻撃の飛来方向を判定（飛び道具の位置または相手の位置）
+            Vector3 attackOrigin = attackerHitbox != null ? attackerHitbox.transform.position : transform.position;
+            if (attackerHitbox != null && attackerHitbox.owner != null)
+            {
+                if (Mathf.Abs(attackerHitbox.transform.position.x - transform.position.x) < 0.1f)
+                {
+                    attackOrigin = attackerHitbox.owner.transform.position;
+                }
+            }
+
+            float faceDir = transform.localScale.x; // 1: 右向き, -1: 左向き
+            float relX = attackOrigin.x - transform.position.x;
+            bool isBackAttack = (faceDir > 0 && relX < 0) || (faceDir < 0 && relX > 0);
+
+            // 正面からの防御
+            if (isBlocking)
+            {
+                if (isParrying)
+                {
+                    // パリー成功
+                    Debug.Log("[Ninja] ★ PARRY SUCCESS! ★");
+                    AudioManager.PlayParrySound();
+
+                    lastParryTime = -10f;
+                    currentPosture = Mathf.Max(0f, currentPosture - damage);
+                    AddMana(10f);
+
+                    if (attackerHitbox != null && attackerHitbox.owner != null)
+                    {
+                        attackerHitbox.owner.Stun(0.6f);
+                    }
+
+                    if (blockShield != null)
+                    {
+                        StartCoroutine(ParrySuccessFeedbackRoutine());
+                    }
+                    return;
+                }
+                else if (!isBackAttack)
+                {
+                    // 通常ガード成功
+                    Debug.Log("[Ninja] Block success. Posture accumulating.");
+                    AudioManager.PlayBlockSound();
+
+                    float postureMultiplier = attackerHitbox != null ? attackerHitbox.postureDamageMultiplier : 1.2f;
+                    currentPosture += damage * postureMultiplier;
+
+                    if (currentPosture >= maxPosture)
+                    {
+                        TriggerGuardBreak();
+                    }
+                    else
+                    {
+                        if (blockShield != null)
+                        {
+                            StartCoroutine(ShieldImpactFlashRoutine());
+                        }
+                    }
+                    return;
+                }
+            }
+
+            CancelCharge();
+            base.TakeDamage(damage, attackerHitbox);
+        }
+
+        private IEnumerator ParrySuccessFeedbackRoutine()
+        {
+            if (blockShield != null)
+            {
+                SpriteRenderer sr = blockShield.GetComponent<SpriteRenderer>();
+                if (sr != null) sr.color = Color.white;
+            }
+            yield return new WaitForSeconds(0.12f);
+            if (blockShield != null && isBlocking)
+            {
+                SpriteRenderer sr = blockShield.GetComponent<SpriteRenderer>();
+                if (sr != null) sr.color = isParrying ? new Color(0.9f, 0.95f, 1f, 0.95f) : new Color(0.3f, 0.8f, 1f, 0.75f);
+            }
+        }
+
+        private IEnumerator ShieldImpactFlashRoutine()
+        {
+            if (blockShield != null)
+            {
+                SpriteRenderer sr = blockShield.GetComponent<SpriteRenderer>();
+                if (sr != null) sr.color = new Color(0.7f, 0.9f, 1f, 1f);
+            }
+            yield return new WaitForSeconds(0.08f);
+            if (blockShield != null && isBlocking)
+            {
+                SpriteRenderer sr = blockShield.GetComponent<SpriteRenderer>();
+                if (sr != null) sr.color = new Color(0.3f, 0.8f, 1f, 0.75f);
+            }
         }
 
         public static Sprite GetOrCreateCircleSprite()

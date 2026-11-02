@@ -464,7 +464,8 @@ namespace FightingGameBase
             if (opponent != null)
             {
                 float faceDir = transform.localScale.x; // 1: 右向き, -1: 左向き
-                float relX = opponent.transform.position.x - transform.position.x;
+                Vector3 attackOrigin = (attackerHitbox != null && Mathf.Abs(attackerHitbox.transform.position.x - transform.position.x) > 0.05f) ? attackerHitbox.transform.position : opponent.transform.position;
+                float relX = attackOrigin.x - transform.position.x;
                 if ((faceDir > 0 && relX < 0) || (faceDir < 0 && relX > 0))
                 {
                     isBackAttack = true; // 背後からの攻撃
@@ -472,7 +473,7 @@ namespace FightingGameBase
             }
 
             // 正面からの防御
-            if (isBlocking && !isBackAttack)
+            if (isBlocking)
             {
                 if (isParrying)
                 {
@@ -491,7 +492,7 @@ namespace FightingGameBase
                     StartCoroutine(ParrySuccessFeedbackRoutine());
                     return;
                 }
-                else
+                else if (!isBackAttack)
                 {
                     // 通常ブロック成功
                     Debug.Log("炎のガード成功！ダメージ防御！");
@@ -809,6 +810,12 @@ namespace FightingGameBase
 
         public override void AttackSpecial()
         {
+            if (isDead || isStunned || isBlockingState) return;
+            if (customSpecialSkill != null && customSpecialSkill.IsActive)
+            {
+                customSpecialSkill.ExecuteSpecial();
+                return;
+            }
             if (isDead || isAttacking || isSpecialAttacking || isBlocking || isGuardBroken || isDashingOrEvading || IsHurtLocked) return;
 
             if (IsSpecialSilenced())
