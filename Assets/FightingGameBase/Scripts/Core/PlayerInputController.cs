@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace FightingGameBase
@@ -119,8 +119,20 @@ namespace FightingGameBase
         {
             if (Keyboard.current != null)
             {
-                // If checking a key for Player 2, allow non-Numpad fallbacks
-                if (character != null && character.playerID == 2)
+                // 1P のキーボード入力フォールバック（矢印キー、WASD、Z/Xなど直感的なキーに対応）
+                if (character != null && character.playerID == 1)
+                {
+                    if (key == leftKey && (Keyboard.current[Key.LeftArrow].isPressed || Keyboard.current[Key.A].isPressed)) return true;
+                    if (key == rightKey && (Keyboard.current[Key.RightArrow].isPressed || Keyboard.current[Key.D].isPressed)) return true;
+                    if (key == jumpKey && (Keyboard.current[Key.Space].isPressed || Keyboard.current[Key.W].isPressed || Keyboard.current[Key.UpArrow].isPressed)) return true;
+                    if (key == normalAttackKey && (Keyboard.current[Key.J].isPressed || Keyboard.current[Key.Z].isPressed)) return true;
+                    if (key == specialAttackKey && (Keyboard.current[Key.K].isPressed || Keyboard.current[Key.X].isPressed)) return true;
+                    if (key == blockKey && (Keyboard.current[Key.H].isPressed || Keyboard.current[Key.LeftShift].isPressed)) return true;
+                    if (key == dashKey && (Keyboard.current[Key.L].isPressed || Keyboard.current[Key.LeftAlt].isPressed)) return true;
+                    if (key == stunAttackKey && (Keyboard.current[Key.C].isPressed || Keyboard.current[Key.V].isPressed)) return true;
+                }
+                // 2P のキーボード入力フォールバック（テンキーなしキーボード用）
+                else if (character != null && character.playerID == 2)
                 {
                     if (key == Key.Numpad1 && Keyboard.current[Key.U].isPressed) return true;
                     if (key == Key.Numpad2 && Keyboard.current[Key.I].isPressed) return true;
@@ -139,7 +151,18 @@ namespace FightingGameBase
         {
             if (Keyboard.current != null)
             {
-                if (character != null && character.playerID == 2)
+                if (character != null && character.playerID == 1)
+                {
+                    if (key == leftKey && (Keyboard.current[Key.LeftArrow].wasPressedThisFrame || Keyboard.current[Key.A].wasPressedThisFrame)) return true;
+                    if (key == rightKey && (Keyboard.current[Key.RightArrow].wasPressedThisFrame || Keyboard.current[Key.D].wasPressedThisFrame)) return true;
+                    if (key == jumpKey && (Keyboard.current[Key.Space].wasPressedThisFrame || Keyboard.current[Key.W].wasPressedThisFrame || Keyboard.current[Key.UpArrow].wasPressedThisFrame)) return true;
+                    if (key == normalAttackKey && (Keyboard.current[Key.J].wasPressedThisFrame || Keyboard.current[Key.Z].wasPressedThisFrame)) return true;
+                    if (key == specialAttackKey && (Keyboard.current[Key.K].wasPressedThisFrame || Keyboard.current[Key.X].wasPressedThisFrame)) return true;
+                    if (key == blockKey && (Keyboard.current[Key.H].wasPressedThisFrame || Keyboard.current[Key.LeftShift].wasPressedThisFrame)) return true;
+                    if (key == dashKey && (Keyboard.current[Key.L].wasPressedThisFrame || Keyboard.current[Key.LeftAlt].wasPressedThisFrame)) return true;
+                    if (key == stunAttackKey && (Keyboard.current[Key.C].wasPressedThisFrame || Keyboard.current[Key.V].wasPressedThisFrame)) return true;
+                }
+                else if (character != null && character.playerID == 2)
                 {
                     if (key == Key.Numpad1 && Keyboard.current[Key.U].wasPressedThisFrame) return true;
                     if (key == Key.Numpad2 && Keyboard.current[Key.I].wasPressedThisFrame) return true;
@@ -158,7 +181,18 @@ namespace FightingGameBase
         {
             if (Keyboard.current != null)
             {
-                if (character != null && character.playerID == 2)
+                if (character != null && character.playerID == 1)
+                {
+                    if (key == leftKey && (Keyboard.current[Key.LeftArrow].wasReleasedThisFrame || Keyboard.current[Key.A].wasReleasedThisFrame)) return true;
+                    if (key == rightKey && (Keyboard.current[Key.RightArrow].wasReleasedThisFrame || Keyboard.current[Key.D].wasReleasedThisFrame)) return true;
+                    if (key == jumpKey && (Keyboard.current[Key.Space].wasReleasedThisFrame || Keyboard.current[Key.W].wasReleasedThisFrame || Keyboard.current[Key.UpArrow].wasReleasedThisFrame)) return true;
+                    if (key == normalAttackKey && (Keyboard.current[Key.J].wasReleasedThisFrame || Keyboard.current[Key.Z].wasReleasedThisFrame)) return true;
+                    if (key == specialAttackKey && (Keyboard.current[Key.K].wasReleasedThisFrame || Keyboard.current[Key.X].wasReleasedThisFrame)) return true;
+                    if (key == blockKey && (Keyboard.current[Key.H].wasReleasedThisFrame || Keyboard.current[Key.LeftShift].wasReleasedThisFrame)) return true;
+                    if (key == dashKey && (Keyboard.current[Key.L].wasReleasedThisFrame || Keyboard.current[Key.LeftAlt].wasReleasedThisFrame)) return true;
+                    if (key == stunAttackKey && (Keyboard.current[Key.C].wasReleasedThisFrame || Keyboard.current[Key.V].wasReleasedThisFrame)) return true;
+                }
+                else if (character != null && character.playerID == 2)
                 {
                     if (key == Key.Numpad1 && Keyboard.current[Key.U].wasReleasedThisFrame) return true;
                     if (key == Key.Numpad2 && Keyboard.current[Key.I].wasReleasedThisFrame) return true;

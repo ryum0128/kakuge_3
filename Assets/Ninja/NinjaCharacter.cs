@@ -61,11 +61,13 @@ namespace FightingGameBase
         private const float KunaiActionInterval = 0.20f; // ステップ間の確実な受付インターバル（二重入力・連打暴発防止）
 
         // 攻撃中フラグ: 外部AIや判定用
-        public override bool IsAttacking => isSlamming;
+        public override bool IsAttacking => isSlamming || (customSpecialSkill != null && customSpecialSkill.IsPerformingSpecial);
 
         // ★通常攻撃中でもスペシャル入力を許可するのは「クナイが設置完了している時（瞬間移動可能時）」のみ！
         public override bool CanInputSpecialDuringAttack =>
-            (activeKunai != null && activeKunai.CurrentState == NinjaYellowKunai.KunaiState.Placed);
+            (customSpecialSkill != null && customSpecialSkill.IsActive)
+                ? customSpecialSkill.CanInputSpecialDuringAttack
+                : (activeKunai != null && activeKunai.CurrentState == NinjaYellowKunai.KunaiState.Placed);
 
         public bool isBlocking { get; private set; } = false;
         public bool isParrying { get; private set; } = false;

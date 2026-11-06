@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System.Collections;
 
 namespace FightingGameBase
@@ -29,7 +29,7 @@ namespace FightingGameBase
         public bool isDashingOrEvading = false;
         
         // 攻撃動作中か判定するための仮想プロパティ（派生先でオーバーライドされます）
-        public virtual bool IsAttacking => false;
+        public virtual bool IsAttacking => (customSpecialSkill != null && customSpecialSkill.IsPerformingSpecial);
 
         /// <summary>
         /// スタンスキルを使用できるかどうか（派生クラスで true にオーバーライドすると使用可能になる）

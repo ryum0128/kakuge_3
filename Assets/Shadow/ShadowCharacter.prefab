@@ -394,10 +394,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FightingGameBase.PlayerInputController
   leftKey: 15
   rightKey: 18
-  jumpKey: 37
+  jumpKey: 1
   normalAttackKey: 24
   specialAttackKey: 25
-  blockKey: 26
+  blockKey: 22
   dashKey: 26
   stunAttackKey: 17
   simultaneousPressWindow: 0.05

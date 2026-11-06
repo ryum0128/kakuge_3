@@ -16,23 +16,27 @@ namespace FightingGameBase
     }
 
     /// <summary>
-    /// 自分流キャラクターカスタマイズ用：
-    /// 任意のキャラクターに対して、7種類のスペシャル攻撃（必殺技）のいずれかを動的に換装・実行するモジュール
+    /// 【CustomSpecialSkill（自在な必殺技モジュール）】
+    /// どのキャラクターでも、選択したスペシャル攻撃（必殺技）をバグなく美しく発動できるモジュール。
+    /// 各スタイルのエフェクト・当たり判定・マナ消費・クールダウンを完全制御します。
     /// </summary>
     public class CustomSpecialSkill : MonoBehaviour
     {
         public SpecialAttackStyle style = SpecialAttackStyle.Flame;
-        public bool IsActive { get; set; } = false;
+        public bool IsActive { get; set; } = true;
+
+        [HideInInspector]
+        public bool IsPerformingSpecial { get; private set; } = false;
 
         private CharacterBase owner;
         private Coroutine activeSpecialCoroutine;
 
-        // --- 忍者クナイ用状態 ---
+        // 忍者クナイ用
         private NinjaYellowKunai activeKunai;
         private float lastKunaiActionTime = -10f;
         private const float KunaiActionInterval = 0.12f;
 
-        // --- 影の領域（沈黙）用状態 ---
+        // 影の領域用
         private float lastShadowSpecialTime = -100f;
         private const float ShadowCooldown = 25f;
 
@@ -49,6 +53,7 @@ namespace FightingGameBase
             owner = character;
             style = specialStyle;
             IsActive = activate;
+            IsPerformingSpecial = false;
         }
 
         public string GetSkillDisplayName()
@@ -57,7 +62,7 @@ namespace FightingGameBase
             {
                 case SpecialAttackStyle.Taiken: return "溜め重斬り";
                 case SpecialAttackStyle.Dagger: return "突進一閃";
-                case SpecialAttackStyle.Flame: return "火球";
+                case SpecialAttackStyle.Flame: return "大火球";
                 case SpecialAttackStyle.Thunder: return "天の落雷";
                 case SpecialAttackStyle.Ice: return "氷結弾";
                 case SpecialAttackStyle.Shadow: return "影の領域";
@@ -131,10 +136,13 @@ namespace FightingGameBase
             if (owner == null) owner = GetComponent<CharacterBase>();
             if (owner == null || owner.isDead || owner.isStunned || owner.IsInGuardBreak() || owner.isBlockingState) return;
 
+            // 忍者クナイのワープ時以外は、すでに必殺技動作中なら重複発動しない
+            if (IsPerformingSpecial && !CanInputSpecialDuringAttack) return;
+
             // 沈黙フィールド判定
             if (owner.IsSpecialSilenced())
             {
-                Debug.Log(string.Format("[CustomSpecial] {0} は影の領域（沈黙フィールド）内のためスペシャル攻撃を発動できません！", owner.name));
+                Debug.Log($"[CustomSpecial] {owner.name} は影の領域（沈黙中）のため必殺技を使用できません！");
                 return;
             }
 
@@ -164,14 +172,23 @@ namespace FightingGameBase
             }
         }
 
+        private float GetFacingDirection()
+        {
+            if (owner != null)
+            {
+                return owner.transform.localScale.x >= 0 ? 1f : -1f;
+            }
+            return 1f;
+        }
+
         // =========================================================================
-        // 1. TAIKEN: 溜め重斬り
+        // 1. TAIKEN: 溜め重斬り (マナ30, 威力35)
         // =========================================================================
         private void ExecuteTaikenSpecial()
         {
             if (owner.currentMana < 30f)
             {
-                Debug.Log(string.Format("[CustomSpecial] マナが不足しています (必要: 30, 現在: {0:F0})", owner.currentMana));
+                Debug.Log($"[CustomSpecial] マナが不足しています (必要: 30, 現在: {owner.currentMana:F0})");
                 return;
             }
             owner.currentMana -= 30f;
@@ -182,7 +199,8 @@ namespace FightingGameBase
 
         private IEnumerator TaikenSpecialRoutine()
         {
-            float facing = owner.transform.localScale.x >= 0 ? 1f : -1f;
+            IsPerformingSpecial = true;
+            float facing = GetFacingDirection();
 
             GameObject swordObj = new GameObject("SpectralGreatsword");
             swordObj.transform.position = owner.transform.position + new Vector3(facing * 0.4f, 0.4f, 0f);
@@ -190,12 +208,12 @@ namespace FightingGameBase
             sr.sprite = GetOrCreateGreatswordSprite();
             sr.color = new Color(1.0f, 0.88f, 0.35f, 0.95f);
             sr.sortingOrder = 14;
-            swordObj.transform.localScale = Vector3.one * 1.6f;
+            swordObj.transform.localScale = new Vector3(facing * 1.6f, 1.6f, 1f);
 
-            float windupTime = 0.25f;
+            float windupTime = 0.22f;
             float elapsed = 0f;
-            Quaternion startRot = Quaternion.Euler(0f, 0f, facing > 0 ? 80f : -80f);
-            Quaternion endRot = Quaternion.Euler(0f, 0f, facing > 0 ? -40f : 40f);
+            Quaternion startRot = Quaternion.Euler(0f, 0f, facing > 0 ? 75f : -75f);
+            Quaternion endRot = Quaternion.Euler(0f, 0f, facing > 0 ? -90f : 90f);
             swordObj.transform.rotation = startRot;
 
             while (elapsed < windupTime)
@@ -229,8 +247,9 @@ namespace FightingGameBase
             {
                 elapsed += Time.deltaTime;
                 float t = Mathf.Clamp01(elapsed / swingTime);
+                t = t * t;
                 swordObj.transform.rotation = Quaternion.Lerp(startRot, endRot, t);
-                swordObj.transform.position = owner.transform.position + new Vector3(facing * (0.4f + t * 0.6f), 0.4f - t * 0.4f, 0f);
+                swordObj.transform.position = owner.transform.position + new Vector3(facing * (0.4f + t * 0.6f), 0.4f - t * 0.3f, 0f);
                 yield return null;
             }
 
@@ -246,16 +265,17 @@ namespace FightingGameBase
             }
 
             if (swordObj != null) Destroy(swordObj);
+            IsPerformingSpecial = false;
         }
 
         // =========================================================================
-        // 2. Dagger: 突進一閃
+        // 2. Dagger: 突進一閃 (マナ20, 威力25)
         // =========================================================================
         private void ExecuteDaggerSpecial()
         {
             if (owner.currentMana < 20f)
             {
-                Debug.Log(string.Format("[CustomSpecial] マナが不足しています (必要: 20, 現在: {0:F0})", owner.currentMana));
+                Debug.Log($"[CustomSpecial] マナが不足しています (必要: 20, 現在: {owner.currentMana:F0})");
                 return;
             }
             owner.currentMana -= 20f;
@@ -266,10 +286,11 @@ namespace FightingGameBase
 
         private IEnumerator DaggerStepSlashRoutine()
         {
-            float facing = owner.transform.localScale.x >= 0 ? 1f : -1f;
+            IsPerformingSpecial = true;
+            float facing = GetFacingDirection();
             Rigidbody2D rb = owner.GetComponent<Rigidbody2D>();
 
-            float dashTime = 0.15f;
+            float dashTime = 0.16f;
             float elapsed = 0f;
 
             GameObject hitboxObj = new GameObject("DaggerSpecialHitbox");
@@ -281,7 +302,7 @@ namespace FightingGameBase
 
             Hitbox hb = hitboxObj.AddComponent<Hitbox>();
             hb.damage = 25;
-            hb.postureDamageMultiplier = 1.3f;
+            hb.postureDamageMultiplier = 1.4f;
             hb.ownerPlayerID = owner.playerID;
             hb.owner = owner;
             hb.isNormalAttack = false;
@@ -291,7 +312,7 @@ namespace FightingGameBase
                 elapsed += Time.deltaTime;
                 if (rb != null)
                 {
-                    rb.linearVelocity = new Vector2(facing * 20f, rb.linearVelocity.y);
+                    rb.linearVelocity = new Vector2(facing * 18f, rb.linearVelocity.y);
                 }
                 SpawnGhostTrail(owner.transform.position, owner.transform.localScale);
                 yield return null;
@@ -302,6 +323,7 @@ namespace FightingGameBase
                 rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
             }
             Destroy(hitboxObj);
+            IsPerformingSpecial = false;
         }
 
         private void SpawnGhostTrail(Vector3 pos, Vector3 scale)
@@ -317,18 +339,18 @@ namespace FightingGameBase
         }
 
         // =========================================================================
-        // 3. Flame: 火球
+        // 3. Flame: 大火球 (マナ20, 威力22)
         // =========================================================================
         private void ExecuteFlameSpecial()
         {
             if (owner.currentMana < 20f)
             {
-                Debug.Log(string.Format("[CustomSpecial] マナが不足しています (必要: 20, 現在: {0:F0})", owner.currentMana));
+                Debug.Log($"[CustomSpecial] マナが不足しています (必要: 20, 現在: {owner.currentMana:F0})");
                 return;
             }
             owner.currentMana -= 20f;
 
-            float facing = owner.transform.localScale.x >= 0 ? 1f : -1f;
+            float facing = GetFacingDirection();
             Vector3 spawnPos = owner.transform.position + new Vector3(facing * 1.0f, 0.2f, 0f);
 
             GameObject fb = new GameObject("FireBall_Projectile");
@@ -357,7 +379,7 @@ namespace FightingGameBase
 
         private IEnumerator FireBallFlightRoutine(GameObject ball, Hitbox hb, float facing)
         {
-            float speed = 13.0f;
+            float speed = 14.0f;
             float maxLifetime = 2.0f;
             float elapsed = 0f;
             bool hitLanded = false;
@@ -404,13 +426,13 @@ namespace FightingGameBase
         }
 
         // =========================================================================
-        // 4. Thunder: 天の落雷
+        // 4. Thunder: 天の落雷 (マナ25, 威力25)
         // =========================================================================
         private void ExecuteThunderSpecial()
         {
             if (owner.currentMana < 25f)
             {
-                Debug.Log(string.Format("[CustomSpecial] マナが不足しています (必要: 25, 現在: {0:F0})", owner.currentMana));
+                Debug.Log($"[CustomSpecial] マナが不足しています (必要: 25, 現在: {owner.currentMana:F0})");
                 return;
             }
             owner.currentMana -= 25f;
@@ -422,7 +444,7 @@ namespace FightingGameBase
         private IEnumerator ThunderStrikeRoutine()
         {
             CharacterBase target = FindOpponent();
-            Vector3 targetPos = target != null ? target.transform.position : owner.transform.position + new Vector3(owner.transform.localScale.x * 4.5f, 0f, 0f);
+            Vector3 targetPos = target != null ? target.transform.position : owner.transform.position + new Vector3(GetFacingDirection() * 4.5f, 0f, 0f);
 
             GameObject reticle = new GameObject("ThunderReticle");
             reticle.transform.position = targetPos;
@@ -432,7 +454,7 @@ namespace FightingGameBase
             retSr.sortingOrder = 8;
             reticle.transform.localScale = new Vector3(1.8f, 0.6f, 1f);
 
-            float chargeTime = 0.45f;
+            float chargeTime = 0.40f;
             float elapsed = 0f;
             while (elapsed < chargeTime)
             {
@@ -459,7 +481,7 @@ namespace FightingGameBase
 
             BoxCollider2D col = bolt.AddComponent<BoxCollider2D>();
             col.isTrigger = true;
-            col.size = new Vector2(1.2f, 1.0f);
+            col.size = new Vector2(1.4f, 1.0f);
 
             Hitbox hb = bolt.AddComponent<Hitbox>();
             hb.damage = 25;
@@ -479,18 +501,18 @@ namespace FightingGameBase
         }
 
         // =========================================================================
-        // 5. Ice: 氷結弾 (相手を確実に1.5秒凍結！)
+        // 5. Ice: 氷結弾 (マナ15, 威力8, 1.5秒凍結拘束)
         // =========================================================================
         private void ExecuteIceSpecial()
         {
             if (owner.currentMana < 15f)
             {
-                Debug.Log(string.Format("[CustomSpecial] マナが不足しています (必要: 15, 現在: {0:F0})", owner.currentMana));
+                Debug.Log($"[CustomSpecial] マナが不足しています (必要: 15, 現在: {owner.currentMana:F0})");
                 return;
             }
             owner.currentMana -= 15f;
 
-            float facing = owner.transform.localScale.x >= 0 ? 1f : -1f;
+            float facing = GetFacingDirection();
             Vector3 spawnPos = owner.transform.position + new Vector3(facing * 1.1f, 0.2f, 0f);
 
             GameObject ball = new GameObject("IceBall_Projectile");
@@ -534,7 +556,6 @@ namespace FightingGameBase
                     {
                         CharacterBase target = hurtbox.owner;
 
-                        // 向き判定（クナイ同様、正面ガードされているかチェック）
                         float faceDir = target.transform.localScale.x;
                         float relX = (ball != null ? ball.transform.position.x : transform.position.x) - target.transform.position.x;
                         bool isFacing = (faceDir > 0 && relX > 0) || (faceDir < 0 && relX < 0);
@@ -543,12 +564,11 @@ namespace FightingGameBase
                         if (isGuarding && isFacing)
                         {
                             AudioManager.PlayBlockSound();
-                            Debug.Log(string.Format("[CustomSpecial] 敵 (P{0}) が氷結弾をガード！凍結を防ぎました。", target.playerID));
+                            Debug.Log($"[CustomSpecial] 敵 (P{target.playerID}) が氷結弾をガードしました！");
                         }
                         else
                         {
-                            // ガードされていなければ確実に1.5秒凍結！
-                            Debug.Log(string.Format("[CustomSpecial] ★ 敵 (P{0}) に氷結弾命中！1.5秒間氷箱に完全凍結！ ★", target.playerID));
+                            Debug.Log($"[CustomSpecial] ★ 敵 (P{target.playerID}) に氷結弾命中！1.5秒間完全凍結！ ★");
                             StartCoroutine(FreezeTargetRoutine(target, 1.5f));
                         }
                     }
@@ -570,18 +590,13 @@ namespace FightingGameBase
             }
         }
 
-        /// <summary>
-        /// 敵キャラクターを水色の氷ブロック（IceBlock_Visual）で1.5秒間完全凍結・拘束！
-        /// </summary>
         private IEnumerator FreezeTargetRoutine(CharacterBase target, float duration)
         {
             if (target == null || target.isDead) yield break;
 
-            // 1. 水色の半透明な氷箱を生成し、キャラクターを包み込む
             GameObject iceBlock = new GameObject("IceBlock_Visual");
             iceBlock.transform.SetParent(target.transform, false);
-            iceBlock.transform.localPosition = new Vector3(0f, 0f, 0f);
-            iceBlock.transform.localScale = Vector3.one;
+            iceBlock.transform.localPosition = Vector3.zero;
 
             SpriteRenderer blockSr = iceBlock.AddComponent<SpriteRenderer>();
             blockSr.sprite = GetOrCreateIceBlockSprite();
@@ -589,21 +604,8 @@ namespace FightingGameBase
             blockSr.sortingOrder = 18;
             iceBlock.transform.localScale = new Vector3(1.35f, 2.35f, 1f);
 
-            // 氷箱の外枠輝きハイライト
-            GameObject borderObj = new GameObject("IceBlock_Border");
-            borderObj.transform.SetParent(iceBlock.transform, false);
-            borderObj.transform.localPosition = Vector3.zero;
-            SpriteRenderer borderSr = borderObj.AddComponent<SpriteRenderer>();
-            borderSr.sprite = GetOrCreateIceBlockSprite();
-            borderSr.color = new Color(0.9f, 0.98f, 1.0f, 0.9f);
-            borderSr.sortingOrder = 19;
-            borderObj.transform.localScale = new Vector3(1.08f, 1.06f, 1f);
-
-            // 2. 移動・アクション完全停止
             Rigidbody2D targetRb = target.GetComponent<Rigidbody2D>();
-            Animator targetAnim = target.GetComponentInChildren<Animator>();
-            float prevAnimSpeed = (targetAnim != null) ? targetAnim.speed : 1f;
-            if (targetAnim != null) targetAnim.speed = 0f;
+            target.ApplyStun(duration);
 
             if (HUDManager.Instance != null)
             {
@@ -614,24 +616,14 @@ namespace FightingGameBase
             while (timer < duration && target != null && !target.isDead)
             {
                 timer += Time.deltaTime;
-                target.isStunned = true;
                 if (targetRb != null) targetRb.linearVelocity = Vector2.zero;
 
-                // 氷箱の冷気パルス明滅
                 if (blockSr != null)
                 {
                     float shimmer = 0.65f + Mathf.Sin(timer * 22f) * 0.12f;
                     blockSr.color = new Color(0.35f, 0.85f, 1.0f, shimmer);
                 }
                 yield return null;
-            }
-
-            // 3. 凍結解除 & 粉砕エフェクト
-            if (targetAnim != null) targetAnim.speed = prevAnimSpeed;
-            if (target != null && !target.isDead)
-            {
-                target.isStunned = false;
-                Debug.Log(string.Format("[CustomSpecial] 敵 (P{0}) の凍結拘束が解除されました！", target.playerID));
             }
 
             if (iceBlock != null)
@@ -658,30 +650,34 @@ namespace FightingGameBase
         }
 
         // =========================================================================
-        // 6. Shadow: 影の領域
+        // 6. Shadow: 影の領域 (CD 25秒, 相手の必殺技を封印)
         // =========================================================================
         private void ExecuteShadowSpecial()
         {
-            float elapsed = Time.time - lastShadowSpecialTime;
-            if (elapsed < ShadowCooldown)
+            float remain = GetCooldownRemaining();
+            if (remain > 0.05f)
             {
-                Debug.Log(string.Format("[CustomSpecial] 影の領域はクールダウン中です（残り {0:F1} 秒）", ShadowCooldown - elapsed));
+                Debug.Log($"[CustomSpecial] 影の領域はクールダウン中です（残り {remain:F1}秒）");
                 return;
             }
-
             lastShadowSpecialTime = Time.time;
-            ShadowDomainField.Spawn(owner.transform.position, ShadowCooldown);
+
+            CharacterBase opponent = FindOpponent();
+            if (opponent != null)
+            {
+                opponent.ApplySilence(7.0f);
+            }
 
             if (HUDManager.Instance != null)
             {
-                HUDManager.Instance.TriggerScreenShake(0.22f, 0.12f);
+                HUDManager.Instance.TriggerScreenShake(0.25f, 0.12f);
             }
 
-            Debug.Log("[CustomSpecial] ★ 影の領域（沈黙フィールド）を展開しました！");
+            Debug.Log("[CustomSpecial] 影の領域発動！ 7秒間敵のスペシャル技を完全封印！");
         }
 
         // =========================================================================
-        // 7. Ninja: 飛雷神クナイ
+        // 7. Ninja: 飛雷神クナイ (クナイ投擲 ＆ ワープ移動)
         // =========================================================================
         private void ExecuteNinjaSpecial()
         {
@@ -690,9 +686,13 @@ namespace FightingGameBase
             if (activeKunai != null && activeKunai.CurrentState == NinjaYellowKunai.KunaiState.Placed)
             {
                 lastKunaiActionTime = Time.time;
-                Vector3 dest = activeKunai.transform.position + Vector3.up * 0.25f;
-                owner.transform.position = dest;
-                AudioManager.PlayTeleportSound();
+                Vector3 teleportPos = activeKunai.transform.position + new Vector3(0f, 0.15f, 0f);
+
+                SpawnGhostTrail(owner.transform.position, owner.transform.localScale);
+                owner.transform.position = teleportPos;
+
+                Rigidbody2D rb = owner.GetComponent<Rigidbody2D>();
+                if (rb != null) rb.linearVelocity = Vector2.zero;
 
                 CharacterBase opp = FindOpponent();
                 if (opp != null)
@@ -722,7 +722,7 @@ namespace FightingGameBase
             if (activeKunai == null || activeKunai.CurrentState == NinjaYellowKunai.KunaiState.Dispelled)
             {
                 lastKunaiActionTime = Time.time;
-                float facing = owner.transform.localScale.x >= 0 ? 1f : -1f;
+                float facing = GetFacingDirection();
                 Vector3 spawnPos = owner.transform.position + new Vector3(facing * 0.9f, 0.2f, 0f);
 
                 GameObject kunaiGo = new GameObject("CustomYellowKunai");
@@ -752,9 +752,6 @@ namespace FightingGameBase
             return null;
         }
 
-        // =========================================================================
-        // コルーチン演出ヘルパー
-        // =========================================================================
         private IEnumerator FadeAndDestroy(GameObject obj, float duration)
         {
             float elapsed = 0f;
@@ -792,7 +789,7 @@ namespace FightingGameBase
         }
 
         // =========================================================================
-        // プロシージャル テクスチャ＆スプライト生成
+        // スプライト生成ヘルパー
         // =========================================================================
         public static Sprite GetOrCreateCircleSprite()
         {
@@ -852,11 +849,10 @@ namespace FightingGameBase
         public static Sprite GetOrCreateFireBallSprite()
         {
             if (cachedFireBallSprite != null) return cachedFireBallSprite;
-            int size = 48;
+            int size = 32;
             Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
             Vector2 center = new Vector2(size * 0.5f, size * 0.5f);
-            float radius = size * 0.46f;
-
+            float radius = size * 0.45f;
             for (int y = 0; y < size; y++)
             {
                 for (int x = 0; x < size; x++)
@@ -864,10 +860,9 @@ namespace FightingGameBase
                     float d = Vector2.Distance(new Vector2(x, y), center);
                     if (d <= radius)
                     {
-                        float norm = d / radius;
-                        if (norm < 0.35f) tex.SetPixel(x, y, new Color(1f, 1f, 0.8f, 1f));
-                        else if (norm < 0.7f) tex.SetPixel(x, y, new Color(1f, 0.6f, 0.1f, 0.95f));
-                        else tex.SetPixel(x, y, new Color(0.9f, 0.15f, 0.05f, (1f - norm) * 2f));
+                        float t = d / radius;
+                        Color c = Color.Lerp(new Color(1f, 0.95f, 0.6f, 1f), new Color(1f, 0.25f, 0.05f, 0.95f), t);
+                        tex.SetPixel(x, y, c);
                     }
                     else
                     {
@@ -883,11 +878,10 @@ namespace FightingGameBase
         public static Sprite GetOrCreateIceBallSprite()
         {
             if (cachedIceBallSprite != null) return cachedIceBallSprite;
-            int size = 40;
+            int size = 32;
             Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
             Vector2 center = new Vector2(size * 0.5f, size * 0.5f);
-            float radius = size * 0.46f;
-
+            float radius = size * 0.45f;
             for (int y = 0; y < size; y++)
             {
                 for (int x = 0; x < size; x++)
@@ -895,10 +889,9 @@ namespace FightingGameBase
                     float d = Vector2.Distance(new Vector2(x, y), center);
                     if (d <= radius)
                     {
-                        float norm = d / radius;
-                        if (norm < 0.3f) tex.SetPixel(x, y, new Color(0.95f, 1f, 1f, 1f));
-                        else if (norm < 0.75f) tex.SetPixel(x, y, new Color(0.4f, 0.85f, 1f, 0.95f));
-                        else tex.SetPixel(x, y, new Color(0.1f, 0.4f, 0.95f, (1f - norm) * 2.5f));
+                        float t = d / radius;
+                        Color c = Color.Lerp(new Color(0.9f, 0.98f, 1f, 1f), new Color(0.2f, 0.7f, 1f, 0.95f), t);
+                        tex.SetPixel(x, y, c);
                     }
                     else
                     {
@@ -914,51 +907,20 @@ namespace FightingGameBase
         public static Sprite GetOrCreateLightningSprite()
         {
             if (cachedLightningSprite != null) return cachedLightningSprite;
-            int width = 24;
-            int height = 128;
-            Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
-            float centerX = width * 0.5f;
-
-            for (int y = 0; y < height; y++)
+            int w = 16, h = 64;
+            Texture2D tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+            for (int y = 0; y < h; y++)
             {
-                for (int x = 0; x < width; x++)
+                for (int x = 0; x < w; x++)
                 {
-                    float dx = Mathf.Abs(x - centerX);
-                    if (dx <= 3f) tex.SetPixel(x, y, Color.white);
-                    else if (dx <= 8f) tex.SetPixel(x, y, new Color(0.3f, 0.8f, 1.0f, 0.8f));
-                    else if (dx <= 11f) tex.SetPixel(x, y, new Color(0.1f, 0.4f, 1.0f, 0.3f));
-                    else tex.SetPixel(x, y, Color.clear);
-                }
-            }
-            tex.Apply();
-            cachedLightningSprite = Sprite.Create(tex, new Rect(0, 0, width, height), new Vector2(0.5f, 0.5f), 32f);
-            return cachedLightningSprite;
-        }
-
-        public static Sprite GetOrCreateGreatswordSprite()
-        {
-            if (cachedGreatswordSprite != null) return cachedGreatswordSprite;
-            int width = 36;
-            int height = 80;
-            Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
-
-            for (int y = 0; y < height; y++)
-            {
-                for (int x = 0; x < width; x++)
-                {
-                    float dx = Mathf.Abs(x - 18f);
-                    if (y >= 20 && y <= 75 && dx <= 12f)
+                    float centerDist = Mathf.Abs(x - w * 0.5f);
+                    if (centerDist < 3.5f)
                     {
-                        if (dx <= 3f) tex.SetPixel(x, y, new Color(1f, 1f, 0.9f, 1f));
-                        else tex.SetPixel(x, y, new Color(1f, 0.82f, 0.2f, 0.95f));
+                        tex.SetPixel(x, y, Color.white);
                     }
-                    else if (y >= 14 && y < 20 && dx <= 16f)
+                    else if (centerDist < 6.5f)
                     {
-                        tex.SetPixel(x, y, new Color(0.95f, 0.7f, 0.1f, 1f));
-                    }
-                    else if (y < 14 && dx <= 4f)
-                    {
-                        tex.SetPixel(x, y, new Color(0.2f, 0.2f, 0.3f, 1f));
+                        tex.SetPixel(x, y, new Color(0.3f, 0.85f, 1f, 0.7f));
                     }
                     else
                     {
@@ -967,7 +929,39 @@ namespace FightingGameBase
                 }
             }
             tex.Apply();
-            cachedGreatswordSprite = Sprite.Create(tex, new Rect(0, 0, width, height), new Vector2(0.5f, 0.15f), 32f);
+            cachedLightningSprite = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 32f);
+            return cachedLightningSprite;
+        }
+
+        public static Sprite GetOrCreateGreatswordSprite()
+        {
+            if (cachedGreatswordSprite != null) return cachedGreatswordSprite;
+            int w = 16, h = 48;
+            Texture2D tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    if (x >= 4 && x <= w - 5 && y >= 6 && y <= h - 4)
+                    {
+                        tex.SetPixel(x, y, new Color(1.0f, 0.9f, 0.3f, 1f));
+                    }
+                    else if (x >= 2 && x <= w - 3 && y >= 4 && y <= 6)
+                    {
+                        tex.SetPixel(x, y, new Color(0.9f, 0.7f, 0.2f, 1f));
+                    }
+                    else if (x >= 6 && x <= w - 7 && y < 4)
+                    {
+                        tex.SetPixel(x, y, new Color(0.6f, 0.4f, 0.2f, 1f));
+                    }
+                    else
+                    {
+                        tex.SetPixel(x, y, Color.clear);
+                    }
+                }
+            }
+            tex.Apply();
+            cachedGreatswordSprite = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.15f), 32f);
             return cachedGreatswordSprite;
         }
     }

@@ -52,7 +52,7 @@ namespace FightingGameBase
         private Coroutine specialAttackCoroutine = null;
         private GameObject currentChargingBall = null;
 
-        public override bool IsAttacking => isAttacking || isSpecialAttacking;
+        public override bool IsAttacking => isAttacking || isSpecialAttacking || (customSpecialSkill != null && customSpecialSkill.IsPerformingSpecial);
 
         [Header("ブロック・パリー設定")]
         [Tooltip("パリー受付時間（秒）")]

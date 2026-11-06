@@ -40,7 +40,7 @@ namespace FightingGameBase
         private Coroutine normalAttackCoroutine;
         private Coroutine specialAttackCoroutine;
 
-        public override bool IsAttacking => isSwinging || isSpecialAttacking;
+        public override bool IsAttacking => isSwinging || isSpecialAttacking || (customSpecialSkill != null && customSpecialSkill.IsPerformingSpecial);
         private float guardBreakDuration = 1.5f;
         
         // DeepWoken Parry Cooldown variables

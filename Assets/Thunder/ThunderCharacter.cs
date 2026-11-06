@@ -50,7 +50,7 @@ namespace FightingGameBase
         public bool isParrying { get; private set; } = false;
         public bool isGuardBroken { get; private set; } = false;
 
-        public override bool IsAttacking => isSwinging || isSpecialAttacking;
+        public override bool IsAttacking => isSwinging || isSpecialAttacking || (customSpecialSkill != null && customSpecialSkill.IsPerformingSpecial);
 
         private float lastParryTime = -10f;
         private Coroutine normalAttackCoroutine;

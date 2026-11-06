@@ -86,8 +86,8 @@ namespace FightingGameBase
                 weaponSr.sprite = GetSquareSprite();
             }
 
-            weaponSr.drawMode = SpriteDrawMode.Sliced;
-            weaponSr.size = new Vector2(1.2f, 0.8f);
+            weaponSr.drawMode = SpriteDrawMode.Simple;
+            weapon.localScale = new Vector3(1.2f, 0.8f, 1f);
             weaponSr.color = new Color(0.85f, 0.88f, 0.95f, 1f); // Metallic silver blade skin
             weaponSr.sortingOrder = 5;
         }

@@ -158,11 +158,11 @@ MonoBehaviour:
   - displayName: Thunder
     prefab: {fileID: 7927899496466660772, guid: f3b149817e924bc4b01e9124a91901a3, type: 3}
   - displayName: Ice
-    prefab: {fileID: 1533608910619255899, guid: fe3c8a58462db974aac3a3087203ea39, type: 3}
+    prefab: {fileID: 3082489647692054832, guid: fe3c8a58462db974aac3a3087203ea39, type: 3}
   - displayName: Shadow
-    prefab: {fileID: 4877245035857516664, guid: fda7e97c88e2a744ca37a8b52b52c25f, type: 3}
+    prefab: {fileID: 8197632180248583560, guid: fda7e97c88e2a744ca37a8b52b52c25f, type: 3}
   - displayName: Ninja
-    prefab: {fileID: 887424416779659110, guid: a048ea76808b3484bba5108516ab6625, type: 3}
+    prefab: {fileID: 4719666620027621630, guid: a048ea76808b3484bba5108516ab6625, type: 3}
   spawnX: 5
   spawnY: -1
 --- !u!4 &82592726

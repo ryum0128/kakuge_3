@@ -1,21 +1,20 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.InputSystem;
 using System.Collections.Generic;
 
 namespace FightingGameBase
 {
     // =================================================================================
-    // CharacterSelectManager: モード選択 ＆ 自分流スタイル構築システム
+    // 【CharacterSelectManager（キャラクターセレクト＆対戦マネージャー）】
     // 
     // 1. 最初に対戦モードを選択:
     //    - [1] 1v1 モード (vs CPU)
     //    - [2] 1v1 プレイヤー対戦 (2P Local)
     //    - [3] テストモード (Test Mode / サンドバッグ)
-    // 2. 1P/2P それぞれ「通常攻撃（基本スタイル）」と「スペシャル攻撃（必殺技）」を選択可能
-    // 3. テストモード中: 「サンドバッグ攻撃設定」ボタンを押すと設定ウィンドウが開閉し、
-    //    攻撃モード（停止/通常/スペシャル）や攻撃間隔（1.0s/1.5s/2.0s/3.0s）を自在に変更可能
-    // 4. スキル選択画面で1〜7の全ボタンが画面内にすっきり収まるよう、高さを最適化
-    // 5. [RuntimeInitializeOnLoadMethod] により全シーンで自動起動
+    // 2. 1P（およびPvP時は2P）のキャラクター（1〜7）を選択
+    //    - 各キャラクター本来の固有スペシャル攻撃・必殺技がそのまま動作します！
+    // 3. テストモード中: サンドバッグ設定パネルから攻撃モードの切り替えが可能
+    // 4. [R]キーでいつでもモード選択画面に戻れます
     // =================================================================================
     public class CharacterSelectManager : MonoBehaviour
     {
@@ -26,7 +25,7 @@ namespace FightingGameBase
             public GameObject prefab;
         }
 
-        [Header("選択できる武器・キャラ一覧")]
+        [Header("選択できるキャラクター一覧 (1〜7)")]
         public WeaponEntry[] weapons;
 
         [Header("配置設定")]
@@ -46,73 +45,41 @@ namespace FightingGameBase
         public enum Phase
         {
             SelectMode,
-            P1SelectNormal,
-            P1SelectSpecial,
-            P2SelectNormal,
-            P2SelectSpecial,
+            SelectP1,
+            SelectP2,
             Fighting
         }
 
-        private GameMode gameMode = GameMode.VsCPU;
-        private Phase phase = Phase.SelectMode;
+        public GameMode gameMode = GameMode.VsCPU;
+        public Phase phase = Phase.SelectMode;
 
         public bool IsSelectingPhase => phase != Phase.Fighting;
 
-        // サンドバッグ設定パネルの開閉状態
-        private bool showSandbagSettings = false;
-
-        // シンプルで直感的な技名定義
-        public struct NormalSkillDef
+        public struct CharDef
         {
             public string name;
             public string summary;
-            public NormalSkillDef(string n, string s) { name = n; summary = s; }
+            public CharDef(string n, string s) { name = n; summary = s; }
         }
 
-        public struct SpecialSkillDef
+        public static readonly CharDef[] CharacterList = new CharDef[]
         {
-            public string name;
-            public string summary;
-            public SpecialAttackStyle style;
-            public SpecialSkillDef(string n, string s, SpecialAttackStyle st)
-            {
-                name = n;
-                summary = s;
-                style = st;
-            }
-        }
-
-        private static readonly NormalSkillDef[] NormalSkills = new NormalSkillDef[]
-        {
-            new NormalSkillDef("大剣", "威力15 / 広範囲近接撃"),
-            new NormalSkillDef("ダガー", "威力8 / 超高速2連撃"),
-            new NormalSkillDef("炎の剣", "威力18 / 踏み込み炎撃"),
-            new NormalSkillDef("雷の槌", "威力16 / 雷光強打撃"),
-            new NormalSkillDef("氷結剣", "威力16 / 冷気の斬撃"),
-            new NormalSkillDef("影の鎌", "威力35 / 長射程・自傷5"),
-            new NormalSkillDef("忍の雷球", "威力25 / 雷球設置＆斬撃")
+            new CharDef("大剣 (TAIKEN)", "豪快な広範囲近接斬撃 ＆ 巨大化溜め重斬り"),
+            new CharDef("ダガー (Dagger)", "超高速の連撃 ＆ 突進一閃スペシャル"),
+            new CharDef("炎 (Flame)", "炎刃スラッシュ ＆ 貫通大火球スペシャル"),
+            new CharDef("雷 (Thunder)", "雷光強打撃 ＆ 天からの落雷スペシャル"),
+            new CharDef("氷 (Ice)", "冷気の氷刃 ＆ 相手を凍結拘束する氷結弾スペシャル"),
+            new CharDef("影 (Shadow)", "長射程の影鎌 ＆ 敵の必殺技を封印する影の領域"),
+            new CharDef("忍者 (Ninja)", "雷球設置攻撃 ＆ 飛雷神クナイテレポート")
         };
 
-        private static readonly SpecialSkillDef[] SpecialSkills = new SpecialSkillDef[]
-        {
-            new SpecialSkillDef("溜め重斬り", "消費マナ30 / 威力35 / 大剣溜め一撃", SpecialAttackStyle.Taiken),
-            new SpecialSkillDef("突進一閃", "消費マナ20 / 威力25 / 高速突進斬り", SpecialAttackStyle.Dagger),
-            new SpecialSkillDef("火球", "消費マナ20 / 威力22 / 貫通火炎弾", SpecialAttackStyle.Flame),
-            new SpecialSkillDef("天の落雷", "消費マナ25 / 威力25 / 頭上への落雷", SpecialAttackStyle.Thunder),
-            new SpecialSkillDef("氷結弾", "消費マナ15 / 威力8 / 相手を1.5秒凍結拘束", SpecialAttackStyle.Ice),
-            new SpecialSkillDef("影の領域", "再使用25秒 / 威力0 / 敵の全必殺技を封印", SpecialAttackStyle.Shadow),
-            new SpecialSkillDef("飛雷神クナイ", "消費マナ0 / 威力10 / クナイ投擲＆テレポート", SpecialAttackStyle.Ninja)
-        };
-
-        // 選択されたインデックス
-        private int p1NormalIndex = 0;
-        private int p1SpecialIndex = 0;
-        private int p2NormalIndex = 2; // デフォルト炎
-        private int p2SpecialIndex = 2;
+        private int p1CharIndex = 0;
+        private int p2CharIndex = 2; // デフォルト炎
 
         private GameObject currentP1;
         private GameObject currentP2;
         private SandbagAI activeSandbag;
+        private bool showSandbagSettings = false;
 
         private static readonly Key[] NumberKeys =
         {
@@ -129,13 +96,11 @@ namespace FightingGameBase
         private Texture2D btnNormalTex;
         private Texture2D btnHoverTex;
         private Texture2D btnActiveTex;
-        private Texture2D highlightBtnTex;
         private GUIStyle titleStyle;
         private GUIStyle subtitleStyle;
         private GUIStyle buttonStyle;
-        private GUIStyle skillButtonStyle;
+        private GUIStyle charButtonStyle;
         private GUIStyle labelStyle;
-        private GUIStyle statusBannerStyle;
         private bool stylesInitialized = false;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -184,7 +149,7 @@ namespace FightingGameBase
             }
         }
 
-        private void InitializeDefaultWeapons()
+        public void InitializeDefaultWeapons()
         {
 #if UNITY_EDITOR
             if (weapons == null || weapons.Length < 7)
@@ -204,6 +169,25 @@ namespace FightingGameBase
                     MakeEntry("Ninja", "Assets/Ninja/NinjaCharacter.prefab"),
                 };
             }
+            else
+            {
+                // 各プレハブが確実にルートオブジェクトを参照しているか検証・補正
+                for (int i = 0; i < weapons.Length; i++)
+                {
+                    if (weapons[i] != null && weapons[i].prefab != null)
+                    {
+                        if (weapons[i].prefab.GetComponent<CharacterBase>() == null)
+                        {
+                            var cb = weapons[i].prefab.GetComponentInParent<CharacterBase>();
+                            if (cb != null) weapons[i].prefab = cb.gameObject;
+                            else if (weapons[i].prefab.transform.root != null && weapons[i].prefab.transform.root.GetComponent<CharacterBase>() != null)
+                            {
+                                weapons[i].prefab = weapons[i].prefab.transform.root.gameObject;
+                            }
+                        }
+                    }
+                }
+            }
 #endif
         }
 
@@ -211,7 +195,13 @@ namespace FightingGameBase
         private static WeaponEntry MakeEntry(string displayName, string prefabPath)
         {
             var entry = new WeaponEntry { displayName = displayName };
-            entry.prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            var loaded = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (loaded != null && loaded.GetComponent<CharacterBase>() == null)
+            {
+                var cb = loaded.GetComponentInParent<CharacterBase>();
+                if (cb != null) loaded = cb.gameObject;
+            }
+            entry.prefab = loaded;
             return entry;
         }
 #endif
@@ -228,7 +218,6 @@ namespace FightingGameBase
                 return;
             }
 
-            // フェーズ毎のキー入力
             switch (phase)
             {
                 case Phase.SelectMode:
@@ -240,28 +229,15 @@ namespace FightingGameBase
                         SelectGameMode(GameMode.TestMode);
                     break;
 
-                case Phase.P1SelectNormal:
+                case Phase.SelectP1:
                     HandleNumberInput(index =>
                     {
-                        if (index >= 0 && index < NormalSkills.Length)
+                        if (index >= 0 && index < weapons.Length && index < CharacterList.Length)
                         {
-                            p1NormalIndex = index;
-                            phase = Phase.P1SelectSpecial;
-                        }
-                    });
-                    if (keyboard[Key.Escape].wasPressedThisFrame || keyboard[Key.B].wasPressedThisFrame)
-                        phase = Phase.SelectMode;
-                    break;
-
-                case Phase.P1SelectSpecial:
-                    HandleNumberInput(index =>
-                    {
-                        if (index >= 0 && index < SpecialSkills.Length)
-                        {
-                            p1SpecialIndex = index;
+                            p1CharIndex = index;
                             if (gameMode == GameMode.PvP)
                             {
-                                phase = Phase.P2SelectNormal;
+                                phase = Phase.SelectP2;
                             }
                             else
                             {
@@ -270,39 +246,25 @@ namespace FightingGameBase
                         }
                     });
                     if (keyboard[Key.Escape].wasPressedThisFrame || keyboard[Key.B].wasPressedThisFrame)
-                        phase = Phase.P1SelectNormal;
+                        phase = Phase.SelectMode;
                     break;
 
-                case Phase.P2SelectNormal:
+                case Phase.SelectP2:
                     HandleNumberInput(index =>
                     {
-                        if (index >= 0 && index < NormalSkills.Length)
+                        if (index >= 0 && index < weapons.Length && index < CharacterList.Length)
                         {
-                            p2NormalIndex = index;
-                            phase = Phase.P2SelectSpecial;
-                        }
-                    });
-                    if (keyboard[Key.Escape].wasPressedThisFrame || keyboard[Key.B].wasPressedThisFrame)
-                        phase = Phase.P1SelectSpecial;
-                    break;
-
-                case Phase.P2SelectSpecial:
-                    HandleNumberInput(index =>
-                    {
-                        if (index >= 0 && index < SpecialSkills.Length)
-                        {
-                            p2SpecialIndex = index;
+                            p2CharIndex = index;
                             StartFight();
                         }
                     });
                     if (keyboard[Key.Escape].wasPressedThisFrame || keyboard[Key.B].wasPressedThisFrame)
-                        phase = Phase.P2SelectNormal;
+                        phase = Phase.SelectP1;
                     break;
 
                 case Phase.Fighting:
                     if (gameMode == GameMode.TestMode && activeSandbag != null)
                     {
-                        // TキーまたはTabキーでサンドバッグ設定を開閉
                         if (keyboard[Key.T].wasPressedThisFrame || keyboard[Key.Tab].wasPressedThisFrame)
                         {
                             showSandbagSettings = !showSandbagSettings;
@@ -336,7 +298,7 @@ namespace FightingGameBase
         public void SelectGameMode(GameMode mode)
         {
             gameMode = mode;
-            phase = Phase.P1SelectNormal;
+            phase = Phase.SelectP1;
         }
 
         public void ReturnToModeSelect()
@@ -353,7 +315,6 @@ namespace FightingGameBase
             }
         }
 
-        // HUDManager からの呼び出し互換用
         public void ResetToCharacterSelect()
         {
             ReturnToModeSelect();
@@ -371,6 +332,27 @@ namespace FightingGameBase
             }
         }
 
+        private GameObject GetSafePrefab(int index)
+        {
+            if (weapons == null || index < 0 || index >= weapons.Length) return null;
+            var prefab = weapons[index].prefab;
+            if (prefab == null) return null;
+
+            // ルートオブジェクトが確実に CharacterBase を持つかチェック・補正
+            if (prefab.GetComponent<CharacterBase>() == null)
+            {
+                var cb = prefab.GetComponentInParent<CharacterBase>();
+                if (cb != null) return cb.gameObject;
+
+                if (prefab.transform.root != null)
+                {
+                    var rootCb = prefab.transform.root.GetComponent<CharacterBase>();
+                    if (rootCb != null) return rootCb.gameObject;
+                }
+            }
+            return prefab;
+        }
+
         public void StartFight()
         {
             IsSpawningFromSelect = true;
@@ -382,12 +364,13 @@ namespace FightingGameBase
             ClearAllExistingCharacters();
 
             // 1P 生成
-            int p1PrefabIndex = Mathf.Clamp(p1NormalIndex, 0, weapons.Length - 1);
-            if (weapons != null && weapons.Length > p1PrefabIndex && weapons[p1PrefabIndex].prefab != null)
+            int p1Index = Mathf.Clamp(p1CharIndex, 0, weapons.Length - 1);
+            GameObject p1Prefab = GetSafePrefab(p1Index);
+            if (p1Prefab != null)
             {
                 Vector3 p1Pos = new Vector3(-spawnX, spawnY, 0f);
-                currentP1 = Instantiate(weapons[p1PrefabIndex].prefab, p1Pos, Quaternion.identity);
-                currentP1.name = $"{weapons[p1PrefabIndex].displayName}_P1";
+                currentP1 = Instantiate(p1Prefab, p1Pos, Quaternion.identity);
+                currentP1.name = $"{weapons[p1Index].displayName}_P1";
 
                 ConfigureCharacterPlayerID(currentP1, 1);
                 FaceDirection(currentP1.transform, 1f);
@@ -396,30 +379,29 @@ namespace FightingGameBase
                 if (char1 != null)
                 {
                     char1.playerID = 1;
-                    var custom1 = currentP1.AddComponent<CustomSpecialSkill>();
-                    custom1.Initialize(char1, SpecialSkills[p1SpecialIndex].style, true);
-                    char1.customSpecialSkill = custom1;
+                    char1.customSpecialSkill = null; // 各キャラ固有のスペシャル攻撃をそのまま使用！
                 }
             }
 
             // 2P / CPU / サンドバッグ 生成
-            int p2PrefabIndex = Mathf.Clamp(p2NormalIndex, 0, weapons.Length - 1);
+            int p2Index = Mathf.Clamp(p2CharIndex, 0, weapons.Length - 1);
             if (gameMode == GameMode.TestMode)
             {
-                p2PrefabIndex = 0; // TAIKEN
+                p2Index = 0; // TAIKEN
             }
 
-            if (weapons != null && weapons.Length > p2PrefabIndex && weapons[p2PrefabIndex].prefab != null)
+            GameObject p2Prefab = GetSafePrefab(p2Index);
+            if (p2Prefab != null)
             {
                 Vector3 p2Pos = new Vector3(spawnX, spawnY, 0f);
-                currentP2 = Instantiate(weapons[p2PrefabIndex].prefab, p2Pos, Quaternion.identity);
+                currentP2 = Instantiate(p2Prefab, p2Pos, Quaternion.identity);
 
                 if (gameMode == GameMode.VsCPU)
-                    currentP2.name = $"{weapons[p2PrefabIndex].displayName}_CPU_P2";
+                    currentP2.name = $"{weapons[p2Index].displayName}_CPU_P2";
                 else if (gameMode == GameMode.TestMode)
                     currentP2.name = "Sandbag_Dummy_P2";
                 else
-                    currentP2.name = $"{weapons[p2PrefabIndex].displayName}_P2";
+                    currentP2.name = $"{weapons[p2Index].displayName}_P2";
 
                 ConfigureCharacterPlayerID(currentP2, 2);
                 FaceDirection(currentP2.transform, -1f);
@@ -428,9 +410,7 @@ namespace FightingGameBase
                 if (char2 != null)
                 {
                     char2.playerID = 2;
-                    var custom2 = currentP2.AddComponent<CustomSpecialSkill>();
-                    custom2.Initialize(char2, SpecialSkills[p2SpecialIndex].style, true);
-                    char2.customSpecialSkill = custom2;
+                    char2.customSpecialSkill = null;
                 }
 
                 if (gameMode == GameMode.VsCPU)
@@ -452,7 +432,7 @@ namespace FightingGameBase
                     activeSandbag.autoAttack = true;
                     activeSandbag.attackInterval = 2.0f;
                     activeSandbag.attackMode = SandbagAI.AttackMode.Normal;
-                    showSandbagSettings = false; // 初期状態ではスッキリ閉じておく
+                    showSandbagSettings = false;
                 }
                 else
                 {
@@ -506,7 +486,6 @@ namespace FightingGameBase
             btnNormalTex = MakeColorTex(new Color(0.14f, 0.18f, 0.25f, 0.96f));
             btnHoverTex = MakeColorTex(new Color(0.24f, 0.38f, 0.58f, 1f));
             btnActiveTex = MakeColorTex(new Color(0.12f, 0.50f, 0.85f, 1f));
-            highlightBtnTex = MakeColorTex(new Color(0.18f, 0.55f, 0.35f, 1f));
 
             titleStyle = new GUIStyle(GUI.skin.label)
             {
@@ -518,7 +497,7 @@ namespace FightingGameBase
 
             subtitleStyle = new GUIStyle(GUI.skin.label)
             {
-                fontSize = 16,
+                fontSize = 15,
                 fontStyle = FontStyle.Bold,
                 alignment = TextAnchor.MiddleCenter,
                 normal = { textColor = new Color(0.85f, 0.92f, 1.0f) }
@@ -526,7 +505,7 @@ namespace FightingGameBase
 
             buttonStyle = new GUIStyle(GUI.skin.button)
             {
-                fontSize = 17,
+                fontSize = 16,
                 fontStyle = FontStyle.Bold,
                 alignment = TextAnchor.MiddleCenter,
                 wordWrap = false
@@ -538,8 +517,7 @@ namespace FightingGameBase
             buttonStyle.active.background = btnActiveTex;
             buttonStyle.active.textColor = Color.white;
 
-            // スキル選択ボタン用（6・7が画面外に出ないよう高さを適度にし、読みやすいフォントに）
-            skillButtonStyle = new GUIStyle(buttonStyle)
+            charButtonStyle = new GUIStyle(buttonStyle)
             {
                 fontSize = 16,
                 fontStyle = FontStyle.Bold,
@@ -548,18 +526,10 @@ namespace FightingGameBase
 
             labelStyle = new GUIStyle(GUI.skin.label)
             {
-                fontSize = 15,
+                fontSize = 14,
                 fontStyle = FontStyle.Bold,
                 alignment = TextAnchor.MiddleCenter,
                 normal = { textColor = new Color(0.80f, 0.90f, 1.0f) }
-            };
-
-            statusBannerStyle = new GUIStyle(GUI.skin.box)
-            {
-                fontSize = 13,
-                fontStyle = FontStyle.Bold,
-                alignment = TextAnchor.MiddleCenter,
-                normal = { background = panelTex, textColor = Color.white }
             };
 
             stylesInitialized = true;
@@ -594,7 +564,7 @@ namespace FightingGameBase
                 return;
             }
 
-            DrawSkillSelectScreen(screenW, screenH);
+            DrawCharacterSelectScreen(screenW, screenH);
         }
 
         // =================================================================================
@@ -645,107 +615,69 @@ namespace FightingGameBase
         }
 
         // =================================================================================
-        // 2. スキル選択画面 (通常攻撃 / スペシャル攻撃) - 1〜7がすべて収まる最適化レイアウト
+        // 2. キャラクター選択画面 (1〜7の武器・キャラを選択)
         // =================================================================================
-        private void DrawSkillSelectScreen(float screenW, float screenH)
+        private void DrawCharacterSelectScreen(float screenW, float screenH)
         {
-            // パネル全体の高さを440px前後に抑え、どんな解像度でも6・7が画面内に完全に収まるようにする
             float panelW = Mathf.Min(700f, screenW - 20f);
-            float panelH = Mathf.Min(440f, screenH - 20f);
+            float panelH = Mathf.Min(450f, screenH - 20f);
             float panelX = (screenW - panelW) * 0.5f;
             float panelY = (screenH - panelH) * 0.5f;
 
             GUI.DrawTexture(new Rect(panelX, panelY, panelW, panelH), panelTex);
 
             float curY = panelY + 12f;
+            int playerNum = (phase == Phase.SelectP1) ? 1 : 2;
 
-            bool isNormalSelect = (phase == Phase.P1SelectNormal || phase == Phase.P2SelectNormal);
-            int playerNumber = (phase == Phase.P1SelectNormal || phase == Phase.P1SelectSpecial) ? 1 : 2;
+            string title = $"【 {playerNum}P  キャラクター選択 】";
+            string subtitle = "使いたいキャラクターを選択してください (1〜7キー または クリック)";
 
-            string titleText = isNormalSelect
-                ? $"【 {playerNumber}P  通常攻撃 を選択 】"
-                : $"【 {playerNumber}P  スペシャル攻撃 を選択 】";
-
-            string subText = isNormalSelect
-                ? "基本攻撃スタイル (1〜7キー または クリック)"
-                : "必殺技スタイル (1〜7キー または クリック)";
-
-            GUI.Label(new Rect(panelX, curY, panelW, 28f), titleText, titleStyle);
+            GUI.Label(new Rect(panelX, curY, panelW, 28f), title, titleStyle);
             curY += 28f;
-            GUI.Label(new Rect(panelX, curY, panelW, 20f), subText, subtitleStyle);
+            GUI.Label(new Rect(panelX, curY, panelW, 20f), subtitle, subtitleStyle);
             curY += 22f;
 
-            // ボタン一覧 (7個) - 高さ35px、間隔5pxに設定（7個合計で約275px）
             float btnW = Mathf.Min(640f, panelW - 30f);
-            float btnH = 35f;
+            float btnH = 36f;
             float btnSpacing = 5f;
             float btnX = panelX + (panelW - btnW) * 0.5f;
 
-            if (isNormalSelect)
+            int count = Mathf.Min(weapons.Length, CharacterList.Length);
+            for (int i = 0; i < count; i++)
             {
-                for (int i = 0; i < NormalSkills.Length; i++)
+                string label = $"[ {i + 1} ]  {CharacterList[i].name}   ―   {CharacterList[i].summary}";
+                if (GUI.Button(new Rect(btnX, curY, btnW, btnH), label, charButtonStyle))
                 {
-                    string label = $"[ {i + 1} ]  {NormalSkills[i].name}   ―   {NormalSkills[i].summary}";
-                    if (GUI.Button(new Rect(btnX, curY, btnW, btnH), label, skillButtonStyle))
+                    if (phase == Phase.SelectP1)
                     {
-                        if (playerNumber == 1)
+                        p1CharIndex = i;
+                        if (gameMode == GameMode.PvP)
                         {
-                            p1NormalIndex = i;
-                            phase = Phase.P1SelectSpecial;
+                            phase = Phase.SelectP2;
                         }
                         else
                         {
-                            p2NormalIndex = i;
-                            phase = Phase.P2SelectSpecial;
-                        }
-                    }
-                    curY += btnH + btnSpacing;
-                }
-            }
-            else
-            {
-                for (int i = 0; i < SpecialSkills.Length; i++)
-                {
-                    string label = $"[ {i + 1} ]  {SpecialSkills[i].name}   ―   {SpecialSkills[i].summary}";
-                    if (GUI.Button(new Rect(btnX, curY, btnW, btnH), label, skillButtonStyle))
-                    {
-                        if (playerNumber == 1)
-                        {
-                            p1SpecialIndex = i;
-                            if (gameMode == GameMode.PvP)
-                            {
-                                phase = Phase.P2SelectNormal;
-                            }
-                            else
-                            {
-                                StartFight();
-                            }
-                        }
-                        else
-                        {
-                            p2SpecialIndex = i;
                             StartFight();
                         }
                     }
-                    curY += btnH + btnSpacing;
+                    else if (phase == Phase.SelectP2)
+                    {
+                        p2CharIndex = i;
+                        StartFight();
+                    }
                 }
+                curY += btnH + btnSpacing;
             }
 
             // フッター
-            curY += 4f;
-            string buildInfo = $"1P: 通常[{NormalSkills[p1NormalIndex].name}]";
-            if (phase != Phase.P1SelectNormal)
-            {
-                buildInfo += $" ＋ 必殺[{SpecialSkills[p1SpecialIndex].name}]";
-            }
-            GUI.Label(new Rect(panelX + 25f, curY, panelW - 170f, 28f), buildInfo, labelStyle);
+            curY += 6f;
+            string status = (phase == Phase.SelectP1) ? "1P 選択中" : $"1P: [{CharacterList[p1CharIndex].name}]  |  2P 選択中";
+            GUI.Label(new Rect(panelX + 25f, curY, panelW - 170f, 28f), status, labelStyle);
 
-            if (GUI.Button(new Rect(panelX + panelW - 140f, curY - 2f, 120f, 30f), "戻る [B]", skillButtonStyle))
+            if (GUI.Button(new Rect(panelX + panelW - 140f, curY - 2f, 120f, 30f), "戻る [B]", charButtonStyle))
             {
-                if (phase == Phase.P1SelectNormal) phase = Phase.SelectMode;
-                else if (phase == Phase.P1SelectSpecial) phase = Phase.P1SelectNormal;
-                else if (phase == Phase.P2SelectNormal) phase = Phase.P1SelectSpecial;
-                else if (phase == Phase.P2SelectSpecial) phase = Phase.P2SelectNormal;
+                if (phase == Phase.SelectP1) phase = Phase.SelectMode;
+                else if (phase == Phase.SelectP2) phase = Phase.SelectP1;
             }
         }
 
@@ -756,7 +688,7 @@ namespace FightingGameBase
         {
             var topBtnStyle = new GUIStyle(buttonStyle) { fontSize = 12 };
 
-            // [R] モード選択へ戻るボタン (コンパクトに右上端へ配置)
+            // [R] モード選択へ戻るボタン
             if (GUI.Button(new Rect(Screen.width - 115f, 10f, 105f, 26f), "[R] メニュー", topBtnStyle))
             {
                 ReturnToModeSelect();
@@ -765,14 +697,12 @@ namespace FightingGameBase
             // テストモード時: 「サンドバッグ設定」トグルボタン＆設定ウィンドウ
             if (gameMode == GameMode.TestMode && activeSandbag != null)
             {
-                // キャラ名と重ならないよう、小型化したボタン: [ ⚙ 設定 ] [TAB]
-                string btnLabel = showSandbagSettings ? "[ ✕ 閉じる ] [TAB]" : "[ ⚙ 設定 ] [TAB]";
+                string btnLabel = showSandbagSettings ? "[ × 閉じる ] [TAB]" : "[ ⚙ 設定 ] [TAB]";
                 if (GUI.Button(new Rect(10f, 10f, 125f, 26f), btnLabel, topBtnStyle))
                 {
                     showSandbagSettings = !showSandbagSettings;
                 }
 
-                // ボタンが押されて開いているときだけ設定変更ウィンドウを表示
                 if (showSandbagSettings)
                 {
                     DrawSandbagControlPanel();
@@ -780,73 +710,81 @@ namespace FightingGameBase
             }
         }
 
-        // =================================================================================
-        // サンドバッグ設定変更ウィンドウ (コンパクトデザイン)
-        // =================================================================================
         private void DrawSandbagControlPanel()
         {
-            float pW = 310f;
-            float pH = 215f;
-            float pX = 10f;
-            float pY = 40f;
+            float panelW = 300f;
+            float panelH = 160f;
+            float panelX = 10f;
+            float panelY = 42f;
 
-            GUI.DrawTexture(new Rect(pX, pY, pW, pH), panelTex);
+            GUI.DrawTexture(new Rect(panelX, panelY, panelW, panelH), panelTex);
 
-            float curY = pY + 10f;
-            var subStyle = new GUIStyle(subtitleStyle) { fontSize = 14 };
-            GUI.Label(new Rect(pX, curY, pW, 22f), "【 サンドバッグ 攻撃設定 】", subStyle);
+            var headerStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 13,
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleCenter,
+                normal = { textColor = new Color(1f, 0.9f, 0.5f) }
+            };
+            GUI.Label(new Rect(panelX, panelY + 6f, panelW, 20f), "【 サンドバッグ動作設定 】", headerStyle);
 
-            curY += 24f;
-            string statusStr = activeSandbag.attackMode == SandbagAI.AttackMode.None ? "停止中 (棒立ち)" :
-                               activeSandbag.attackMode == SandbagAI.AttackMode.Normal ? "通常攻撃リピート" : "必殺技リピート";
-            var miniLabelStyle = new GUIStyle(labelStyle) { fontSize = 12 };
-            GUI.Label(new Rect(pX + 10f, curY, pW - 20f, 18f), $"状態: {statusStr}", miniLabelStyle);
+            var optBtnStyle = new GUIStyle(GUI.skin.button)
+            {
+                fontSize = 12,
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleCenter
+            };
 
-            curY += 22f;
-            float btnW = 280f;
-            float btnH = 27f;
-            float btnX = pX + 15f;
+            float curY = panelY + 30f;
+            GUI.Label(new Rect(panelX + 10f, curY, panelW - 20f, 18f), "攻撃モード:", labelStyle);
+            curY += 20f;
 
-            var smallBtnStyle = new GUIStyle(buttonStyle) { fontSize = 12 };
+            float btnW = 86f;
+            float btnH = 28f;
 
-            // 1. 攻撃停止
-            if (GUI.Button(new Rect(btnX, curY, btnW, btnH), "[ 1 ] 攻撃停止 (棒立ち)", smallBtnStyle))
+            Color oldBg = GUI.backgroundColor;
+
+            // [1] 停止
+            if (activeSandbag.attackMode == SandbagAI.AttackMode.None) GUI.backgroundColor = new Color(0.3f, 0.8f, 0.4f);
+            if (GUI.Button(new Rect(panelX + 10f, curY, btnW, btnH), "[1] 停止", optBtnStyle))
             {
                 activeSandbag.SetAttackMode(SandbagAI.AttackMode.None);
             }
 
-            curY += btnH + 4f;
-            // 2. 通常攻撃リピート
-            if (GUI.Button(new Rect(btnX, curY, btnW, btnH), "[ 2 ] 通常攻撃リピート", smallBtnStyle))
+            // [2] 通常攻撃
+            GUI.backgroundColor = (activeSandbag.attackMode == SandbagAI.AttackMode.Normal) ? new Color(0.3f, 0.8f, 0.4f) : oldBg;
+            if (GUI.Button(new Rect(panelX + 105f, curY, btnW, btnH), "[2] 通常", optBtnStyle))
             {
                 activeSandbag.SetAttackMode(SandbagAI.AttackMode.Normal);
             }
 
-            curY += btnH + 4f;
-            // 3. スペシャル攻撃リピート
-            if (GUI.Button(new Rect(btnX, curY, btnW, btnH), "[ 3 ] スペシャル攻撃リピート", smallBtnStyle))
+            // [3] 特殊攻撃
+            GUI.backgroundColor = (activeSandbag.attackMode == SandbagAI.AttackMode.Special) ? new Color(0.3f, 0.8f, 0.4f) : oldBg;
+            if (GUI.Button(new Rect(panelX + 200f, curY, btnW, btnH), "[3] 特殊", optBtnStyle))
             {
                 activeSandbag.SetAttackMode(SandbagAI.AttackMode.Special);
             }
 
-            // 攻撃間隔の調整
-            curY += btnH + 8f;
-            GUI.Label(new Rect(pX + 10f, curY, pW - 20f, 18f), $"攻撃間隔:  現在 {activeSandbag.attackInterval:F1} 秒", miniLabelStyle);
+            GUI.backgroundColor = oldBg;
 
-            curY += 19f;
-            float intervalBtnW = 64f;
+            curY += btnH + 10f;
+            GUI.Label(new Rect(panelX + 10f, curY, panelW - 20f, 18f), $"攻撃間隔: {activeSandbag.attackInterval:F1}秒", labelStyle);
+            curY += 20f;
+
+            float intBtnW = 62f;
             float[] intervals = { 1.0f, 1.5f, 2.0f, 3.0f };
             for (int i = 0; i < intervals.Length; i++)
             {
                 float val = intervals[i];
-                float ix = btnX + i * (intervalBtnW + 8f);
-                bool isSelected = Mathf.Approximately(activeSandbag.attackInterval, val);
-                string intLabel = isSelected ? $"★{val:F1}s" : $"{val:F1}s";
-                if (GUI.Button(new Rect(ix, curY, intervalBtnW, 24f), intLabel, smallBtnStyle))
+                if (Mathf.Approximately(activeSandbag.attackInterval, val)) GUI.backgroundColor = new Color(0.3f, 0.8f, 0.4f);
+                else GUI.backgroundColor = oldBg;
+
+                if (GUI.Button(new Rect(panelX + 10f + i * 70f, curY, intBtnW, 24f), $"{val:F1}s", optBtnStyle))
                 {
                     activeSandbag.attackInterval = val;
                 }
             }
+            GUI.backgroundColor = oldBg;
         }
     }
 }

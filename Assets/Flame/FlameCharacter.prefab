@@ -549,6 +549,7 @@ MonoBehaviour:
   currentMana: 50
   manaRegenSpeed: 8
   isBlockingState: 0
+  customSpecialSkill: {fileID: 0}
   visualsTransform: {fileID: 4592015301301282655}
   blockShield: {fileID: 291831856485165643}
   redBallWeapon: {fileID: 6812703895311506225}
